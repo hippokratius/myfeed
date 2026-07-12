@@ -19,7 +19,21 @@ android {
         versionName = "1.0.0"
     }
 
+    // Fester Debug-Keystore, damit CI-Builds über Installationen hinweg
+    // dieselbe Signatur tragen (sonst lehnt Android Updates ab).
+    signingConfigs {
+        getByName("debug") {
+            storeFile = rootProject.file("signing/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = false
         }

@@ -56,6 +56,11 @@ Bei jedem Push baut GitHub Actions die Debug-APK und hängt sie als
 Artifact **kvaesitso-rss-debug-apk** an den Workflow-Lauf an
 (Actions-Tab → letzter Lauf → Artifacts).
 
+Alle Debug-Builds werden mit dem eingecheckten Keystore
+`signing/debug.keystore` signiert (Standard-Debug-Passwörter, kein
+Geheimnis) — dadurch lassen sich neue APKs ohne Deinstallation über die
+bestehende Installation aktualisieren.
+
 ## Architektur
 
 ```
