@@ -1,0 +1,89 @@
+package de.hippokratius.kvaesitsorss.ui
+
+import android.content.Intent
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import de.hippokratius.kvaesitsorss.KvaesitsoRssApp
+import java.net.URLEncoder
+
+class MainActivity : ComponentActivity() {
+
+    private var pendingGroupId by mutableStateOf<String?>(null)
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        pendingGroupId = intent?.getStringExtra(EXTRA_GROUP_ID)
+
+        val graph = (application as KvaesitsoRssApp).graph
+        setContent {
+            AppTheme {
+                val navController = rememberNavController()
+
+                LaunchedEffect(pendingGroupId) {
+                    pendingGroupId?.let { groupId ->
+                        navController.navigate("group/${URLEncoder.encode(groupId, "UTF-8")}")
+                        pendingGroupId = null
+                    }
+                }
+
+                NavHost(navController = navController, startDestination = "feeds") {
+                    composable("feeds") {
+                        FeedsScreen(
+                            graph = graph,
+                            onOpenSettings = { navController.navigate("settings") },
+                        )
+                    }
+                    composable("settings") {
+                        SettingsScreen(graph = graph, onBack = { navController.popBackStack() })
+                    }
+                    composable("group/{groupId}") { backStackEntry ->
+                        GroupScreen(
+                            graph = graph,
+                            groupId = backStackEntry.arguments?.getString("groupId").orEmpty(),
+                            onBack = { navController.popBackStack() },
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        intent.getStringExtra(EXTRA_GROUP_ID)?.let { pendingGroupId = it }
+    }
+
+    companion object {
+        const val EXTRA_GROUP_ID = "de.hippokratius.kvaesitsorss.extra.GROUP_ID"
+    }
+}
+
+@Composable
+private fun AppTheme(content: @Composable () -> Unit) {
+    val darkTheme = isSystemInDarkTheme()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val colorScheme = when {
+        android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S ->
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        darkTheme -> darkColorScheme()
+        else -> lightColorScheme()
+    }
+    MaterialTheme(colorScheme = colorScheme, content = content)
+}

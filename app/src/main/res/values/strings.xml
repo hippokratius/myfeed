@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Kvaesitso RSS</string>
+    <string name="widget_label">RSS-Feed</string>
+    <string name="widget_description">Scrollbarer RSS-Reader mit Themen-Gruppierung für den Startbildschirm</string>
+    <string name="widget_no_feeds">Noch keine Feeds – tippe hier, um Feeds hinzuzufügen</string>
+    <string name="widget_no_articles">Noch keine Artikel – tippe auf ↻ zum Aktualisieren</string>
+    <string name="widget_more_articles">+%1$d weitere Artikel</string>
+
+    <string name="action_refresh">Aktualisieren</string>
+    <string name="action_settings">Einstellungen</string>
+    <string name="action_import_opml">OPML importieren</string>
+    <string name="action_add_feed">Feed hinzufügen</string>
+    <string name="action_add">Hinzufügen</string>
+    <string name="action_cancel">Abbrechen</string>
+    <string name="action_delete">Löschen</string>
+    <string name="action_back">Zurück</string>
+
+    <string name="feeds_empty_hint">Noch keine Feeds. Füge mit dem +-Button eine Feed-URL hinzu oder importiere eine OPML-Datei über das Menü.</string>
+    <string name="feed_url_label">Feed-URL</string>
+    <string name="feed_url_invalid">Feed konnte nicht geladen werden. Bitte URL prüfen.</string>
+    <string name="opml_imported">%1$d Feeds importiert</string>
+
+    <string name="settings_refresh_interval">Aktualisierungsintervall</string>
+    <string name="settings_minutes">%1$d Minuten</string>
+    <string name="settings_max_age">Artikel aufbewahren</string>
+    <string name="settings_days">%1$d Tage</string>
+    <string name="settings_show_images">Bilder anzeigen</string>
+    <string name="settings_grouping">Ähnliche Artikel gruppieren</string>
+
+    <string name="group_title">Artikel zum Thema</string>
+</resources>

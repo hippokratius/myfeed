@@ -1,0 +1,87 @@
+package de.hippokratius.kvaesitsorss.fetch
+
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import java.io.File
+import okhttp3.OkHttpClient
+import okhttp3.Request
+
+/**
+ * Lädt Artikel-Bilder herunter, skaliert sie auf Widget-taugliche Größe
+ * und legt sie als JPEG im internen Speicher ab.
+ */
+class ThumbnailStore(context: Context, private val client: OkHttpClient) {
+
+    private val dir = File(context.filesDir, "thumbs")
+
+    fun fileFor(articleId: Long): File = File(dir, "$articleId.jpg")
+
+    /** @return Pfad zur gespeicherten Datei oder null bei Fehlern. */
+    fun download(articleId: Long, url: String): String? {
+        return runCatching {
+            dir.mkdirs()
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", FeedSyncer.USER_AGENT)
+                .build()
+            val bytes = client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return null
+                val body = response.body ?: return null
+                if (body.contentLength() > MAX_DOWNLOAD_BYTES) return null
+                body.byteStream().readNBytesCompat(MAX_DOWNLOAD_BYTES)
+            }
+
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+            var sampleSize = 1
+            while (
+                bounds.outWidth / (sampleSize * 2) >= MAX_DIMENSION_PX ||
+                bounds.outHeight / (sampleSize * 2) >= MAX_DIMENSION_PX
+            ) {
+                sampleSize *= 2
+            }
+            val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return null
+
+            val file = fileFor(articleId)
+            file.outputStream().use { out ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)
+            }
+            bitmap.recycle()
+            file.absolutePath
+        }.getOrNull()
+    }
+
+    /** Entfernt Thumbnails, deren Artikel nicht mehr existieren. */
+    fun prune(validArticleIds: Set<Long>) {
+        dir.listFiles()?.forEach { file ->
+            val id = file.nameWithoutExtension.toLongOrNull()
+            if (id == null || id !in validArticleIds) {
+                file.delete()
+            }
+        }
+    }
+
+    private fun java.io.InputStream.readNBytesCompat(limit: Int): ByteArray {
+        val buffer = java.io.ByteArrayOutputStream()
+        val chunk = ByteArray(16 * 1024)
+        var total = 0
+        while (true) {
+            val read = read(chunk)
+            if (read < 0) break
+            total += read
+            if (total > limit) return buffer.toByteArray()
+            buffer.write(chunk, 0, read)
+        }
+        return buffer.toByteArray()
+    }
+
+    companion object {
+        private const val MAX_DOWNLOAD_BYTES = 8 * 1024 * 1024
+        private const val MAX_DIMENSION_PX = 400
+        private const val JPEG_QUALITY = 85
+    }
+}
