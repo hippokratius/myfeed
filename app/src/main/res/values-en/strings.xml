@@ -6,6 +6,7 @@
     <string name="widget_no_feeds">No feeds yet – tap here to add feeds</string>
     <string name="widget_no_articles">No articles yet – tap ↻ to refresh</string>
     <string name="widget_more_articles">+%1$d more articles</string>
+    <string name="widget_updated_at">Updated %1$s</string>
 
     <string name="action_refresh">Refresh</string>
     <string name="action_settings">Settings</string>

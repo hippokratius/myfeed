@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -14,6 +15,8 @@ data class AppSettings(
     val maxAgeDays: Int = 7,
     val showImages: Boolean = true,
     val groupingEnabled: Boolean = true,
+    /** Zeitpunkt des letzten erfolgreichen Syncs (Epoch-Millis, 0 = nie). */
+    val lastSyncMillis: Long = 0,
 )
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
@@ -25,6 +28,7 @@ class SettingsRepository(private val context: Context) {
         val maxAgeDays = intPreferencesKey("max_age_days")
         val showImages = booleanPreferencesKey("show_images")
         val groupingEnabled = booleanPreferencesKey("grouping_enabled")
+        val lastSync = longPreferencesKey("last_sync_millis")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { prefs ->
@@ -33,6 +37,7 @@ class SettingsRepository(private val context: Context) {
             maxAgeDays = prefs[Keys.maxAgeDays] ?: 7,
             showImages = prefs[Keys.showImages] ?: true,
             groupingEnabled = prefs[Keys.groupingEnabled] ?: true,
+            lastSyncMillis = prefs[Keys.lastSync] ?: 0,
         )
     }
 
@@ -52,5 +57,9 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setGroupingEnabled(enabled: Boolean) {
         context.dataStore.edit { it[Keys.groupingEnabled] = enabled }
+    }
+
+    suspend fun setLastSyncMillis(millis: Long) {
+        context.dataStore.edit { it[Keys.lastSync] = millis }
     }
 }

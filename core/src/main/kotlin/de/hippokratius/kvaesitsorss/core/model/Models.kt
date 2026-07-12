@@ -14,6 +14,8 @@ data class RssItem(
 data class ParsedFeed(
     val title: String?,
     val items: List<RssItem>,
+    /** Vom Feed deklariertes Logo (RSS channel/image, Atom icon/logo). */
+    val iconUrl: String? = null,
 )
 
 /** Ein Feed-Eintrag aus einer OPML-Datei. */

@@ -16,6 +16,9 @@ interface FeedDao {
     @Query("SELECT * FROM feeds WHERE enabled = 1")
     suspend fun getEnabled(): List<FeedEntity>
 
+    @Query("SELECT * FROM feeds")
+    suspend fun getAll(): List<FeedEntity>
+
     @Query("SELECT COUNT(*) FROM feeds")
     suspend fun count(): Int
 
@@ -30,6 +33,9 @@ interface FeedDao {
 
     @Query("UPDATE feeds SET title = :title WHERE id = :id")
     suspend fun updateTitle(id: Long, title: String)
+
+    @Query("UPDATE feeds SET iconUrl = :iconUrl, iconPath = :iconPath WHERE id = :id")
+    suspend fun updateIcon(id: Long, iconUrl: String?, iconPath: String?)
 }
 
 @Dao

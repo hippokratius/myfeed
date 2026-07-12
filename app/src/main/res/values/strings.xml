@@ -6,6 +6,7 @@
     <string name="widget_no_feeds">Noch keine Feeds – tippe hier, um Feeds hinzuzufügen</string>
     <string name="widget_no_articles">Noch keine Artikel – tippe auf ↻ zum Aktualisieren</string>
     <string name="widget_more_articles">+%1$d weitere Artikel</string>
+    <string name="widget_updated_at">Aktualisiert %1$s</string>
 
     <string name="action_refresh">Aktualisieren</string>
     <string name="action_settings">Einstellungen</string>

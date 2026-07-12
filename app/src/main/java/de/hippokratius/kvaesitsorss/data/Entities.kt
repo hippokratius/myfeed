@@ -14,6 +14,10 @@ data class FeedEntity(
     val url: String,
     val title: String,
     val enabled: Boolean = true,
+    /** Vom Feed deklariertes Logo (RSS channel/image, Atom icon). */
+    val iconUrl: String? = null,
+    /** Pfad zum lokal gecachten, verkleinerten Logo. */
+    val iconPath: String? = null,
 )
 
 @Entity(

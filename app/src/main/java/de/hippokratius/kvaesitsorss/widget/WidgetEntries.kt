@@ -2,6 +2,7 @@ package de.hippokratius.kvaesitsorss.widget
 
 import de.hippokratius.kvaesitsorss.data.ArticleDao
 import de.hippokratius.kvaesitsorss.data.ArticleEntity
+import de.hippokratius.kvaesitsorss.data.FeedDao
 
 /** Anzeigemodell des Widgets: Einzelartikel oder Themen-Gruppe. */
 sealed interface WidgetEntry {
@@ -22,10 +23,24 @@ sealed interface WidgetEntry {
     }
 }
 
+/** Daten für ein Widget-Rendering: Einträge plus Favicon-Pfade je Feed. */
+data class WidgetData(
+    val entries: List<WidgetEntry>,
+    /** feedId → Pfad des gecachten Feed-Logos. */
+    val feedIconPaths: Map<Long, String>,
+)
+
 object WidgetEntries {
 
     const val MAX_ENTRIES = 40
     const val MAX_RELATED_SHOWN = 3
+
+    suspend fun buildData(articleDao: ArticleDao, feedDao: FeedDao): WidgetData {
+        val icons = feedDao.getAll()
+            .mapNotNull { feed -> feed.iconPath?.let { feed.id to it } }
+            .toMap()
+        return WidgetData(build(articleDao), icons)
+    }
 
     /**
      * Formt die neuesten Artikel in die Widget-Liste um: Artikel mit gleicher

@@ -62,9 +62,13 @@ class FeedSyncer(
             if (settings.showImages) {
                 downloadThumbnails()
             }
-            thumbnailStore.prune(articleDao.allIds().toSet())
+            thumbnailStore.prune(
+                validArticleIds = articleDao.allIds().toSet(),
+                validFeedIds = feedDao.getAll().map { it.id }.toSet(),
+            )
 
             regroup(settings.groupingEnabled)
+            settingsRepository.setLastSyncMillis(System.currentTimeMillis())
             RssWidget.updateAll(context)
         }
     }
@@ -84,6 +88,15 @@ class FeedSyncer(
             feedDao.updateTitle(feed.id, parsed.title!!)
         }
         val sourceTitle = feed.title.ifBlank { parsed.title ?: feed.url }
+
+        // Feed-Logo cachen, wenn neu oder geändert.
+        val iconUrl = parsed.iconUrl
+        if (iconUrl != null && (iconUrl != feed.iconUrl || feed.iconPath == null)) {
+            val path = thumbnailStore.downloadIcon(feed.id, iconUrl)
+            if (path != null) {
+                feedDao.updateIcon(feed.id, iconUrl, path)
+            }
+        }
 
         val articles = parsed.items.map { item ->
             ArticleEntity(

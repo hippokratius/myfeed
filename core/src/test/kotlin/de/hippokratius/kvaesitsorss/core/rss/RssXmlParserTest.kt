@@ -16,6 +16,11 @@ class RssXmlParserTest {
             <rss version="2.0">
               <channel>
                 <title>Tagesschau</title>
+                <image>
+                  <url>https://example.org/logo.png</url>
+                  <title>Tagesschau</title>
+                  <link>https://example.org</link>
+                </image>
                 <item>
                   <title><![CDATA[Bundesregierung beschließt neues Klimapaket]]></title>
                   <link>https://example.org/politik/klimapaket</link>
@@ -30,6 +35,7 @@ class RssXmlParserTest {
         )
 
         assertEquals("Tagesschau", feed.title)
+        assertEquals("https://example.org/logo.png", feed.iconUrl)
         assertEquals(1, feed.items.size)
         val item = feed.items.single()
         assertEquals("Bundesregierung beschließt neues Klimapaket", item.title)
@@ -70,6 +76,18 @@ class RssXmlParserTest {
         assertEquals("https://example.org/img/chip-big.jpg", feed.items[0].imageUrl)
         assertEquals("https://example.org/img/inline.png", feed.items[1].imageUrl)
         assertNull(feed.items[2].imageUrl)
+    }
+
+    @Test
+    fun `feed without declared logo has null iconUrl`() {
+        val feed = RssXmlParser.parse(
+            """
+            <rss version="2.0"><channel><title>Ohne Logo</title>
+              <item><title>A</title><link>https://example.org/a</link></item>
+            </channel></rss>
+            """.trimIndent(),
+        )
+        assertNull(feed.iconUrl)
     }
 
     @Test
@@ -124,6 +142,7 @@ class RssXmlParserTest {
             <?xml version="1.0" encoding="utf-8"?>
             <feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
               <title>Beispiel-Blog</title>
+              <icon>https://example.org/favicon.png</icon>
               <entry>
                 <title>Hello World</title>
                 <link rel="alternate" type="text/html" href="https://example.org/hello"/>
@@ -144,6 +163,7 @@ class RssXmlParserTest {
         )
 
         assertEquals("Beispiel-Blog", feed.title)
+        assertEquals("https://example.org/favicon.png", feed.iconUrl)
         assertEquals(2, feed.items.size)
         assertEquals("https://example.org/hello", feed.items[0].link)
         assertEquals("https://example.org/hello.png", feed.items[0].imageUrl)

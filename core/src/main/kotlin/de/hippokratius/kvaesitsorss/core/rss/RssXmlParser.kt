@@ -52,7 +52,17 @@ object RssXmlParser {
             ?: throw FeedFormatException("RSS ohne <channel>")
         val feedTitle = HtmlText.clean(channel.firstChild("title")?.text()).ifBlank { null }
         val items = channel.children("item").mapNotNull { parseRssItem(it) }
-        return ParsedFeed(feedTitle, items)
+        return ParsedFeed(feedTitle, items, channelIconUrl(channel))
+    }
+
+    /** RSS: channel > image > url; itunes:image als Fallback. */
+    private fun channelIconUrl(channel: Element): String? {
+        val imageUrl = channel.firstChild("image")?.firstChild("url")?.text()?.trim()
+        if (imageUrl.isHttpUrl()) return imageUrl
+        val itunesHref = channel.children("image")
+            .firstOrNull { it.getAttribute("href").isHttpUrl() }
+            ?.getAttribute("href")?.trim()
+        return itunesHref?.takeIf { it.isHttpUrl() }
     }
 
     private fun parseRssItem(item: Element): RssItem? {
@@ -83,7 +93,9 @@ object RssXmlParser {
     private fun parseAtom(root: Element): ParsedFeed {
         val feedTitle = HtmlText.clean(root.firstChild("title")?.text()).ifBlank { null }
         val items = root.children("entry").mapNotNull { parseAtomEntry(it) }
-        return ParsedFeed(feedTitle, items)
+        val icon = (root.firstChild("icon")?.text() ?: root.firstChild("logo")?.text())
+            ?.trim()?.takeIf { it.isHttpUrl() }
+        return ParsedFeed(feedTitle, items, icon)
     }
 
     private fun parseAtomEntry(entry: Element): RssItem? {
@@ -118,7 +130,10 @@ object RssXmlParser {
         val channel = root.firstChild("channel")
         val feedTitle = HtmlText.clean(channel?.firstChild("title")?.text()).ifBlank { null }
         val items = root.children("item").mapNotNull { parseRssItem(it) }
-        return ParsedFeed(feedTitle, items)
+        // RSS 1.0: <image> liegt als Geschwister des <channel> und enthält <url>.
+        val icon = root.firstChild("image")?.firstChild("url")?.text()?.trim()
+            ?.takeIf { it.isHttpUrl() }
+        return ParsedFeed(feedTitle, items, icon)
     }
 
     // ---- Bilder ----

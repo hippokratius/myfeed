@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
+import android.text.format.DateFormat
 import android.text.format.DateUtils
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
@@ -52,10 +53,18 @@ import de.hippokratius.kvaesitsorss.R
 import de.hippokratius.kvaesitsorss.data.ArticleEntity
 import de.hippokratius.kvaesitsorss.fetch.FeedFetchWorker
 import de.hippokratius.kvaesitsorss.ui.MainActivity
+import java.util.Date
 
 class RssWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = RssWidget()
 }
+
+/** Vorab geladene Bitmaps für ein Rendering (RemoteViews-Speicher ist knapp). */
+private class WidgetBitmaps(
+    val articleImages: Map<Long, Bitmap>,
+    val relatedThumbs: Map<Long, Bitmap>,
+    val feedIcons: Map<Long, Bitmap>,
+)
 
 class RssWidget : GlanceAppWidget() {
 
@@ -63,36 +72,69 @@ class RssWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val app = context.applicationContext as KvaesitsoRssApp
-        val entries = WidgetEntries.build(app.graph.articleDao)
-        val showImages = app.graph.settingsRepository.current().showImages
-        val bitmaps = if (showImages) loadBitmaps(entries) else emptyMap()
+        val data = WidgetEntries.buildData(app.graph.articleDao, app.graph.feedDao)
+        val settings = app.graph.settingsRepository.current()
+        val bitmaps = if (settings.showImages) {
+            loadBitmaps(data)
+        } else {
+            WidgetBitmaps(emptyMap(), emptyMap(), loadFeedIcons(data))
+        }
         val hasFeeds = app.graph.feedDao.count() > 0
 
         provideContent {
             GlanceTheme {
-                WidgetRoot(entries, bitmaps, hasFeeds)
+                WidgetRoot(data.entries, bitmaps, hasFeeds, settings.lastSyncMillis)
             }
         }
     }
 
-    /** Bitmaps vorab laden – begrenzt, da RemoteViews-Speicher knapp ist. */
-    private fun loadBitmaps(entries: List<WidgetEntry>): Map<Long, Bitmap> {
-        val result = mutableMapOf<Long, Bitmap>()
-        for (entry in entries) {
-            if (result.size >= MAX_BITMAPS) break
+    private fun loadBitmaps(data: WidgetData): WidgetBitmaps {
+        val articleImages = mutableMapOf<Long, Bitmap>()
+        val relatedThumbs = mutableMapOf<Long, Bitmap>()
+
+        // Große Artikelbilder: Gruppen-Hauptartikel und neueste Einzelartikel zuerst.
+        for (entry in data.entries) {
+            if (articleImages.size >= MAX_ARTICLE_BITMAPS) break
             val article = when (entry) {
                 is WidgetEntry.Single -> entry.article
                 is WidgetEntry.Group -> entry.main
             }
-            val path = article.thumbPath ?: continue
-            val bitmap = runCatching { BitmapFactory.decodeFile(path) }.getOrNull() ?: continue
-            result[article.id] = bitmap
+            decode(article.thumbPath)?.let { articleImages[article.id] = it }
         }
-        return result
+
+        // Kleine Thumbnails für verwandte Artikel der obersten Gruppen.
+        for (entry in data.entries.filterIsInstance<WidgetEntry.Group>().take(MAX_GROUPS_WITH_THUMBS)) {
+            for (related in entry.related) {
+                if (relatedThumbs.size >= MAX_RELATED_BITMAPS) break
+                decode(related.thumbPath)?.let { relatedThumbs[related.id] = it }
+            }
+        }
+
+        return WidgetBitmaps(articleImages, relatedThumbs, loadFeedIcons(data))
+    }
+
+    private fun loadFeedIcons(data: WidgetData): Map<Long, Bitmap> {
+        val icons = mutableMapOf<Long, Bitmap>()
+        for ((feedId, path) in data.feedIconPaths) {
+            if (icons.size >= MAX_FEED_ICONS) break
+            decode(path)?.let { icons[feedId] = it }
+        }
+        return icons
+    }
+
+    private fun decode(path: String?): Bitmap? {
+        if (path == null) return null
+        val options = BitmapFactory.Options().apply {
+            inPreferredConfig = Bitmap.Config.RGB_565
+        }
+        return runCatching { BitmapFactory.decodeFile(path, options) }.getOrNull()
     }
 
     companion object {
-        private const val MAX_BITMAPS = 10
+        private const val MAX_ARTICLE_BITMAPS = 14
+        private const val MAX_RELATED_BITMAPS = 12
+        private const val MAX_GROUPS_WITH_THUMBS = 4
+        private const val MAX_FEED_ICONS = 20
 
         suspend fun updateAll(context: Context) {
             RssWidget().updateAll(context)
@@ -105,8 +147,9 @@ class RssWidget : GlanceAppWidget() {
 @Composable
 private fun WidgetRoot(
     entries: List<WidgetEntry>,
-    bitmaps: Map<Long, Bitmap>,
+    bitmaps: WidgetBitmaps,
     hasFeeds: Boolean,
+    lastSyncMillis: Long,
 ) {
     var root = GlanceModifier
         .fillMaxSize()
@@ -115,16 +158,22 @@ private fun WidgetRoot(
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         root = root.cornerRadius(20.dp)
     }
-    Column(modifier = root.padding(horizontal = 12.dp, vertical = 8.dp)) {
-        Header()
+    Column(modifier = root.padding(horizontal = 14.dp, vertical = 10.dp)) {
+        Header(lastSyncMillis)
         when {
             !hasFeeds -> EmptyHint(R.string.widget_no_feeds)
             entries.isEmpty() -> EmptyHint(R.string.widget_no_articles)
             else -> LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
                 items(entries, itemId = { it.itemId() }) { entry ->
                     when (entry) {
-                        is WidgetEntry.Single -> SingleArticleRow(entry.article, bitmaps[entry.article.id])
-                        is WidgetEntry.Group -> GroupCard(entry, bitmaps[entry.main.id])
+                        is WidgetEntry.Single -> Column(modifier = GlanceModifier.fillMaxWidth()) {
+                            LargeArticle(entry.article, bitmaps.articleImages[entry.article.id], bitmaps.feedIcons)
+                            EntryDivider()
+                        }
+                        is WidgetEntry.Group -> Column(modifier = GlanceModifier.fillMaxWidth()) {
+                            GroupBlock(entry, bitmaps)
+                            EntryDivider()
+                        }
                     }
                 }
             }
@@ -138,27 +187,38 @@ private fun WidgetEntry.itemId(): Long = when (this) {
 }
 
 @Composable
-private fun Header() {
+private fun Header(lastSyncMillis: Long) {
     val context = LocalContext.current
     Row(
-        modifier = GlanceModifier.fillMaxWidth().padding(bottom = 4.dp),
+        modifier = GlanceModifier.fillMaxWidth().padding(bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = context.getString(R.string.widget_label),
-            style = TextStyle(
-                color = GlanceTheme.colors.primary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-            ),
-            modifier = GlanceModifier
-                .defaultWeight()
-                .clickable(actionStartActivity(Intent(context, MainActivity::class.java))),
-        )
+        Column(modifier = GlanceModifier.defaultWeight().clickable(openAppAction(context))) {
+            Text(
+                text = context.getString(R.string.widget_label),
+                style = TextStyle(
+                    color = GlanceTheme.colors.onSurface,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                ),
+            )
+            if (lastSyncMillis > 0) {
+                Text(
+                    text = context.getString(
+                        R.string.widget_updated_at,
+                        DateFormat.getTimeFormat(context).format(Date(lastSyncMillis)),
+                    ),
+                    style = TextStyle(
+                        color = GlanceTheme.colors.onSurfaceVariant,
+                        fontSize = 11.sp,
+                    ),
+                )
+            }
+        }
         Image(
             provider = ImageProvider(R.drawable.ic_widget_refresh),
             contentDescription = context.getString(R.string.action_refresh),
-            colorFilter = ColorFilter.tint(GlanceTheme.colors.primary),
+            colorFilter = ColorFilter.tint(GlanceTheme.colors.onSurfaceVariant),
             modifier = GlanceModifier
                 .size(24.dp)
                 .clickable(actionRunCallback<RefreshAction>()),
@@ -172,7 +232,7 @@ private fun EmptyHint(textRes: Int) {
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
-            .clickable(actionStartActivity(Intent(context, MainActivity::class.java))),
+            .clickable(openAppAction(context)),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -182,145 +242,175 @@ private fun EmptyHint(textRes: Int) {
     }
 }
 
+/**
+ * Smart-Launcher-Look: großes Bild in voller Breite, darunter Quellenzeile
+ * (Favicon + Name + relative Zeit), darunter die Überschrift groß und fett.
+ */
 @Composable
-private fun SingleArticleRow(article: ArticleEntity, bitmap: Bitmap?) {
-    Column(modifier = GlanceModifier.fillMaxWidth()) {
-        Row(
-            modifier = GlanceModifier
-                .fillMaxWidth()
-                .padding(vertical = 6.dp)
-                .clickable(openArticleAction(article.link)),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = GlanceModifier.defaultWeight()) {
-                Text(
-                    text = article.title,
-                    style = TextStyle(
-                        color = GlanceTheme.colors.onSurface,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                    ),
-                    maxLines = 3,
-                )
-                MetaLine(article)
+private fun LargeArticle(
+    article: ArticleEntity,
+    image: Bitmap?,
+    feedIcons: Map<Long, Bitmap>,
+) {
+    Column(
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+            .clickable(openArticleAction(article.link)),
+    ) {
+        if (image != null) {
+            var imageModifier = GlanceModifier.fillMaxWidth().height(150.dp)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                imageModifier = imageModifier.cornerRadius(16.dp)
             }
-            if (bitmap != null) {
-                Spacer(modifier = GlanceModifier.width(8.dp))
-                Thumbnail(bitmap, sizeDp = 56)
-            }
+            Image(
+                provider = ImageProvider(image),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = imageModifier,
+            )
+            Spacer(modifier = GlanceModifier.height(8.dp))
         }
-        Divider()
+        SourceLine(article, feedIcons)
+        Spacer(modifier = GlanceModifier.height(2.dp))
+        Text(
+            text = article.title,
+            style = TextStyle(
+                color = GlanceTheme.colors.onSurface,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+            ),
+            maxLines = 3,
+        )
     }
 }
 
+/** Gruppe: Hauptartikel groß, verwandte Artikel als kompakte Unter-Karten. */
 @Composable
-private fun GroupCard(group: WidgetEntry.Group, mainBitmap: Bitmap?) {
+private fun GroupBlock(group: WidgetEntry.Group, bitmaps: WidgetBitmaps) {
     val context = LocalContext.current
-    var card = GlanceModifier
-        .fillMaxWidth()
-        .background(GlanceTheme.colors.secondaryContainer)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        card = card.cornerRadius(12.dp)
-    }
-    Column(modifier = GlanceModifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        Column(modifier = card.padding(10.dp)) {
-            // Hauptartikel: Bild oben, große Überschrift darunter.
-            Column(modifier = GlanceModifier.fillMaxWidth().clickable(openArticleAction(group.main.link))) {
-                if (mainBitmap != null) {
-                    var image = GlanceModifier.fillMaxWidth().height(110.dp)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        image = image.cornerRadius(8.dp)
-                    }
-                    Image(
-                        provider = ImageProvider(mainBitmap),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = image,
-                    )
-                    Spacer(modifier = GlanceModifier.height(6.dp))
-                }
-                Text(
-                    text = group.main.title,
-                    style = TextStyle(
-                        color = GlanceTheme.colors.onSecondaryContainer,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                    ),
-                    maxLines = 3,
-                )
-                MetaLine(group.main, onContainer = true)
-            }
+    Column(modifier = GlanceModifier.fillMaxWidth()) {
+        LargeArticle(group.main, bitmaps.articleImages[group.main.id], bitmaps.feedIcons)
 
-            // Verwandte Artikel, kompakt und einzeln antippbar.
-            for (related in group.related) {
-                Spacer(modifier = GlanceModifier.height(6.dp))
-                Column(modifier = GlanceModifier.fillMaxWidth().clickable(openArticleAction(related.link))) {
-                    Text(
-                        text = related.title,
-                        style = TextStyle(
-                            color = GlanceTheme.colors.onSecondaryContainer,
-                            fontSize = 13.sp,
-                        ),
-                        maxLines = 2,
-                    )
-                    MetaLine(related, onContainer = true)
-                }
-            }
+        for (related in group.related) {
+            RelatedCard(related, bitmaps.relatedThumbs[related.id], bitmaps.feedIcons)
+            Spacer(modifier = GlanceModifier.height(6.dp))
+        }
 
-            if (group.extraCount > 0) {
-                Spacer(modifier = GlanceModifier.height(6.dp))
-                Text(
-                    text = context.getString(R.string.widget_more_articles, group.extraCount),
-                    style = TextStyle(
-                        color = GlanceTheme.colors.primary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                    ),
-                    modifier = GlanceModifier.clickable(
+        if (group.extraCount > 0) {
+            Text(
+                text = context.getString(R.string.widget_more_articles, group.extraCount),
+                style = TextStyle(
+                    color = GlanceTheme.colors.primary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                ),
+                modifier = GlanceModifier
+                    .padding(vertical = 4.dp)
+                    .clickable(
                         actionStartActivity(
                             Intent(context, MainActivity::class.java)
                                 .putExtra(MainActivity.EXTRA_GROUP_ID, group.groupId),
                         ),
                     ),
-                )
-            }
+            )
         }
     }
 }
 
 @Composable
-private fun MetaLine(article: ArticleEntity, onContainer: Boolean = false) {
+private fun RelatedCard(
+    article: ArticleEntity,
+    thumb: Bitmap?,
+    feedIcons: Map<Long, Bitmap>,
+) {
+    var card = GlanceModifier
+        .fillMaxWidth()
+        .background(GlanceTheme.colors.surfaceVariant)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        card = card.cornerRadius(12.dp)
+    }
+    Row(
+        modifier = card.padding(10.dp).clickable(openArticleAction(article.link)),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = GlanceModifier.defaultWeight()) {
+            SourceLine(article, feedIcons, onVariant = true)
+            Spacer(modifier = GlanceModifier.height(2.dp))
+            Text(
+                text = article.title,
+                style = TextStyle(
+                    color = GlanceTheme.colors.onSurfaceVariant,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                ),
+                maxLines = 3,
+            )
+        }
+        if (thumb != null) {
+            Spacer(modifier = GlanceModifier.width(10.dp))
+            var thumbModifier = GlanceModifier.size(64.dp)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                thumbModifier = thumbModifier.cornerRadius(8.dp)
+            }
+            Image(
+                provider = ImageProvider(thumb),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = thumbModifier,
+            )
+        }
+    }
+}
+
+/** Quellenzeile: kleines Feed-Logo (falls vorhanden), Name links, Zeit rechts. */
+@Composable
+private fun SourceLine(
+    article: ArticleEntity,
+    feedIcons: Map<Long, Bitmap>,
+    onVariant: Boolean = false,
+) {
+    val color = GlanceTheme.colors.onSurfaceVariant
     val relativeTime = DateUtils.getRelativeTimeSpanString(
         article.publishedAt,
         System.currentTimeMillis(),
         DateUtils.MINUTE_IN_MILLIS,
     ).toString()
-    Text(
-        text = "${article.sourceTitle} · $relativeTime",
-        style = TextStyle(
-            color = if (onContainer) GlanceTheme.colors.onSecondaryContainer else GlanceTheme.colors.onSurfaceVariant,
-            fontSize = 11.sp,
-        ),
-        maxLines = 1,
-    )
-}
-
-@Composable
-private fun Thumbnail(bitmap: Bitmap, sizeDp: Int) {
-    var modifier = GlanceModifier.size(sizeDp.dp)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        modifier = modifier.cornerRadius(8.dp)
+    Row(
+        modifier = GlanceModifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val icon = feedIcons[article.feedId]
+        if (icon != null) {
+            var iconModifier = GlanceModifier.size(16.dp)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                iconModifier = iconModifier.cornerRadius(8.dp)
+            }
+            Image(
+                provider = ImageProvider(icon),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = iconModifier,
+            )
+            Spacer(modifier = GlanceModifier.width(6.dp))
+        }
+        Text(
+            text = article.sourceTitle,
+            style = TextStyle(color = color, fontSize = 11.sp),
+            maxLines = 1,
+            modifier = GlanceModifier.defaultWeight(),
+        )
+        Spacer(modifier = GlanceModifier.width(8.dp))
+        Text(
+            text = relativeTime,
+            style = TextStyle(color = color, fontSize = 11.sp),
+            maxLines = 1,
+        )
     }
-    Image(
-        provider = ImageProvider(bitmap),
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
-        modifier = modifier,
-    )
 }
 
 @Composable
-private fun Divider() {
+private fun EntryDivider() {
     Spacer(
         modifier = GlanceModifier
             .fillMaxWidth()
@@ -331,6 +421,9 @@ private fun Divider() {
 
 private fun openArticleAction(link: String) =
     actionStartActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
+
+private fun openAppAction(context: Context) =
+    actionStartActivity(Intent(context, MainActivity::class.java))
 
 /** Manueller Refresh über den Button im Widget-Header. */
 class RefreshAction : ActionCallback {
