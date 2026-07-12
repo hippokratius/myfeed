@@ -33,6 +33,8 @@ object FeedCatalog {
         CatalogFeed("ZEIT ONLINE", "https://newsfeed.zeit.de/index", CatalogCategory.NEWS, "de"),
         CatalogFeed("Süddeutsche Zeitung", "https://rss.sueddeutsche.de/rss/Topthemen", CatalogCategory.NEWS, "de"),
         CatalogFeed("Deutsche Welle", "https://rss.dw.com/rdf/rss-de-all", CatalogCategory.NEWS, "de"),
+        CatalogFeed("KATAPULT MV", "https://katapult-mv.de/feed/", CatalogCategory.NEWS, "de"),
+        CatalogFeed("KATAPULTU", "https://katapultu-magazin.de/feed/", CatalogCategory.NEWS, "de"),
         CatalogFeed("BBC News", "https://feeds.bbci.co.uk/news/rss.xml", CatalogCategory.NEWS, "en"),
         CatalogFeed("The Guardian", "https://www.theguardian.com/world/rss", CatalogCategory.NEWS, "en"),
 
@@ -40,9 +42,18 @@ object FeedCatalog {
         CatalogFeed("heise online", "https://www.heise.de/rss/heise-atom.xml", CatalogCategory.TECH, "de"),
         CatalogFeed("Golem.de", "https://rss.golem.de/rss.php?feed=RSS2.0", CatalogCategory.TECH, "de"),
         CatalogFeed("netzpolitik.org", "https://netzpolitik.org/feed/", CatalogCategory.TECH, "de"),
+        CatalogFeed("t3n", "https://t3n.de/rss.xml", CatalogCategory.TECH, "de"),
+        CatalogFeed("ComputerBase", "https://www.computerbase.de/rss/news.xml", CatalogCategory.TECH, "de"),
+        CatalogFeed("Caschys Blog", "https://stadt-bremerhaven.de/feed/", CatalogCategory.TECH, "de"),
         CatalogFeed("The Verge", "https://www.theverge.com/rss/index.xml", CatalogCategory.TECH, "en"),
         CatalogFeed("Ars Technica", "https://feeds.arstechnica.com/arstechnica/index", CatalogCategory.TECH, "en"),
         CatalogFeed("Hacker News", "https://news.ycombinator.com/rss", CatalogCategory.TECH, "en"),
+        CatalogFeed("TechCrunch", "https://techcrunch.com/feed/", CatalogCategory.TECH, "en"),
+        CatalogFeed("WIRED", "https://www.wired.com/feed/rss", CatalogCategory.TECH, "en"),
+        CatalogFeed("Engadget", "https://www.engadget.com/rss.xml", CatalogCategory.TECH, "en"),
+        CatalogFeed("MIT Technology Review", "https://www.technologyreview.com/feed/", CatalogCategory.TECH, "en"),
+        CatalogFeed("The Register", "https://www.theregister.com/headlines.atom", CatalogCategory.TECH, "en"),
+        CatalogFeed("BBC Technology", "https://feeds.bbci.co.uk/news/technology/rss.xml", CatalogCategory.TECH, "en"),
 
         // Sport
         CatalogFeed("Sportschau", "https://www.sportschau.de/index~rss2.xml", CatalogCategory.SPORT, "de"),
@@ -52,8 +63,15 @@ object FeedCatalog {
         // Wissenschaft
         CatalogFeed("Spektrum der Wissenschaft", "https://www.spektrum.de/alias/rss/spektrum-de-rss-feed/996406", CatalogCategory.SCIENCE, "de"),
         CatalogFeed("scinexx", "https://www.scinexx.de/feed/", CatalogCategory.SCIENCE, "de"),
+        CatalogFeed("KATAPULT", "https://katapult-magazin.de/rss.xml", CatalogCategory.SCIENCE, "de"),
+        CatalogFeed("wissenschaft.de", "https://www.wissenschaft.de/feed/", CatalogCategory.SCIENCE, "de"),
+        CatalogFeed("Quarks", "https://www.quarks.de/feed/", CatalogCategory.SCIENCE, "de"),
         CatalogFeed("Nature News", "https://www.nature.com/nature.rss", CatalogCategory.SCIENCE, "en"),
         CatalogFeed("Science Daily", "https://www.sciencedaily.com/rss/all.xml", CatalogCategory.SCIENCE, "en"),
+        CatalogFeed("New Scientist", "https://www.newscientist.com/feed/home/", CatalogCategory.SCIENCE, "en"),
+        CatalogFeed("Phys.org", "https://phys.org/rss-feed/", CatalogCategory.SCIENCE, "en"),
+        CatalogFeed("Quanta Magazine", "https://www.quantamagazine.org/feed/", CatalogCategory.SCIENCE, "en"),
+        CatalogFeed("BBC Science", "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml", CatalogCategory.SCIENCE, "en"),
 
         // Wirtschaft
         CatalogFeed("Handelsblatt", "https://www.handelsblatt.com/contentexport/feed/schlagzeilen", CatalogCategory.ECONOMY, "de"),
