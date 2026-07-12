@@ -3,6 +3,7 @@ package de.hippokratius.kvaesitsorss.core.catalog
 /** Thema eines Katalog-Feeds; die App mappt auf lokalisierte Anzeigenamen. */
 enum class CatalogCategory {
     NEWS,
+    REGIONAL,
     TECH,
     SPORT,
     SCIENCE,
@@ -33,10 +34,18 @@ object FeedCatalog {
         CatalogFeed("ZEIT ONLINE", "https://newsfeed.zeit.de/index", CatalogCategory.NEWS, "de"),
         CatalogFeed("Süddeutsche Zeitung", "https://rss.sueddeutsche.de/rss/Topthemen", CatalogCategory.NEWS, "de"),
         CatalogFeed("Deutsche Welle", "https://rss.dw.com/rdf/rss-de-all", CatalogCategory.NEWS, "de"),
-        CatalogFeed("KATAPULT MV", "https://katapult-mv.de/feed/", CatalogCategory.NEWS, "de"),
         CatalogFeed("KATAPULTU", "https://katapultu-magazin.de/feed/", CatalogCategory.NEWS, "de"),
+        CatalogFeed("DER STANDARD", "https://www.derstandard.at/rss", CatalogCategory.NEWS, "de"),
+        CatalogFeed("ORF News", "https://rss.orf.at/news.xml", CatalogCategory.NEWS, "de"),
         CatalogFeed("BBC News", "https://feeds.bbci.co.uk/news/rss.xml", CatalogCategory.NEWS, "en"),
         CatalogFeed("The Guardian", "https://www.theguardian.com/world/rss", CatalogCategory.NEWS, "en"),
+
+        // Regional
+        CatalogFeed("NDR", "https://www.ndr.de/nachrichten/index-rss.xml", CatalogCategory.REGIONAL, "de"),
+        CatalogFeed("MDR", "https://www.mdr.de/nachrichten/nachrichten100-rss.xml", CatalogCategory.REGIONAL, "de"),
+        CatalogFeed("WDR", "https://www1.wdr.de/nachrichten/index~rss2.xml", CatalogCategory.REGIONAL, "de"),
+        CatalogFeed("hessenschau", "https://www.hessenschau.de/index.rss", CatalogCategory.REGIONAL, "de"),
+        CatalogFeed("KATAPULT MV", "https://katapult-mv.de/feed/", CatalogCategory.REGIONAL, "de"),
 
         // Technik
         CatalogFeed("heise online", "https://www.heise.de/rss/heise-atom.xml", CatalogCategory.TECH, "de"),

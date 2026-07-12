@@ -37,6 +37,7 @@
     <string name="discover_language_en">Englisch</string>
 
     <string name="category_news">Nachrichten</string>
+    <string name="category_regional">Regional</string>
     <string name="category_tech">Technik</string>
     <string name="category_sport">Sport</string>
     <string name="category_science">Wissenschaft</string>
