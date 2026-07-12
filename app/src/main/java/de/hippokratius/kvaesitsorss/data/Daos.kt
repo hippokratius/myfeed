@@ -61,11 +61,20 @@ interface ArticleDao {
     @Query("SELECT * FROM articles ORDER BY publishedAt DESC LIMIT :limit")
     suspend fun newest(limit: Int): List<ArticleEntity>
 
+    @Query("SELECT * FROM articles ORDER BY publishedAt DESC LIMIT :limit")
+    fun observeNewest(limit: Int): Flow<List<ArticleEntity>>
+
     @Query(
         "SELECT a.* FROM articles a JOIN feeds f ON a.feedId = f.id " +
             "WHERE f.category = :category ORDER BY a.publishedAt DESC LIMIT :limit",
     )
     suspend fun newestInCategory(category: String, limit: Int): List<ArticleEntity>
+
+    @Query(
+        "SELECT a.* FROM articles a JOIN feeds f ON a.feedId = f.id " +
+            "WHERE f.category = :category ORDER BY a.publishedAt DESC LIMIT :limit",
+    )
+    fun observeNewestInCategory(category: String, limit: Int): Flow<List<ArticleEntity>>
 
     @Query("SELECT * FROM articles WHERE groupId = :groupId ORDER BY publishedAt DESC")
     fun observeGroup(groupId: String): Flow<List<ArticleEntity>>

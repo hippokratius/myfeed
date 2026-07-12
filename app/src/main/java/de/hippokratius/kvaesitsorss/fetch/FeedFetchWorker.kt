@@ -8,10 +8,13 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import de.hippokratius.kvaesitsorss.KvaesitsoRssApp
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 class FeedFetchWorker(
     context: Context,
@@ -58,5 +61,11 @@ class FeedFetchWorker(
                 request,
             )
         }
+
+        /** Läuft gerade ein manuell angestoßener Sync? (Für Pull-to-Refresh in der App.) */
+        fun observeSyncRunning(context: Context): Flow<Boolean> =
+            WorkManager.getInstance(context)
+                .getWorkInfosForUniqueWorkFlow(ONE_TIME_WORK_NAME)
+                .map { infos -> infos.any { it.state == WorkInfo.State.RUNNING } }
     }
 }

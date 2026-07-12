@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Statische App-Shortcuts. Kvaesitso kann Wischgesten nicht nur mit Apps,
+    sondern auch mit App-Shortcuts belegen – so lässt sich z. B. eine Geste
+    direkt auf die Feed-Verwaltung legen, während das normale Öffnen der App
+    im Fullscreen-Reader landet.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="manage_feeds"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_feeds"
+        android:shortcutShortLabel="@string/shortcut_feeds_short"
+        android:shortcutLongLabel="@string/action_manage_feeds">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="de.hippokratius.kvaesitsorss"
+            android:targetClass="de.hippokratius.kvaesitsorss.ui.MainActivity">
+            <extra
+                android:name="de.hippokratius.kvaesitsorss.extra.SCREEN"
+                android:value="feeds" />
+        </intent>
+    </shortcut>
+</shortcuts>

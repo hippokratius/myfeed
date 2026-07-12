@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
@@ -67,6 +68,7 @@ private const val FILTER_UNCATEGORIZED = ""
 @Composable
 fun FeedsScreen(
     graph: AppGraph,
+    onBack: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenDiscover: () -> Unit,
 ) {
@@ -128,7 +130,15 @@ fun FeedsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.app_name)) },
+                title = { Text(stringResource(R.string.action_manage_feeds)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back),
+                        )
+                    }
+                },
                 actions = {
                     IconButton(onClick = { FeedFetchWorker.syncNow(context) }) {
                         Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.action_refresh))

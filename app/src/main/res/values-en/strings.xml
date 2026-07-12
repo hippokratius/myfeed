@@ -54,4 +54,8 @@
     <string name="widget_config_hint">Which feeds should this widget show?</string>
     <string name="widget_config_all_categories">All categories</string>
     <string name="widget_no_articles_in_category">No articles in this category</string>
+
+    <string name="reader_title">Your feed</string>
+    <string name="action_manage_feeds">Manage feeds</string>
+    <string name="shortcut_feeds_short">Feeds</string>
 </resources>

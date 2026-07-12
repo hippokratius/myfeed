@@ -179,7 +179,7 @@ private fun WidgetRoot(
             entries.isEmpty() && category != null -> EmptyHint(R.string.widget_no_articles_in_category)
             entries.isEmpty() -> EmptyHint(R.string.widget_no_articles)
             else -> LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
-                items(entries, itemId = { it.itemId() }) { entry ->
+                items(entries, itemId = { it.stableId }) { entry ->
                     when (entry) {
                         is WidgetEntry.Single -> Column(modifier = GlanceModifier.fillMaxWidth()) {
                             LargeArticle(entry.article, bitmaps.articleImages[entry.article.id], bitmaps.feedIcons)
@@ -194,11 +194,6 @@ private fun WidgetRoot(
             }
         }
     }
-}
-
-private fun WidgetEntry.itemId(): Long = when (this) {
-    is WidgetEntry.Single -> article.id
-    is WidgetEntry.Group -> -(main.id + 1)
 }
 
 @Composable

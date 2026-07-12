@@ -17,6 +17,10 @@ Smart Launchers).
 
 - **Scrollbares Feed-Widget**: Überschriften mit Quelle und relativer Zeit,
   Thumbnails, wo der Feed Bilder liefert
+- **Vollbild-Reader in der App**: Die App startet direkt im Feed – gleiche
+  Inhalte wie das Widget, aber mit großen Bildern, Kategorie-Filter-Chips
+  und Pull-to-Refresh. Verwandte Artikel einer Themen-Gruppe sind hier als
+  **horizontal scrollbare Karten-Reihe** zu sehen
 - **Themen-Gruppierung**: Artikel verschiedener Quellen zum selben Thema werden
   als Karte zusammengefasst – Hauptartikel groß (mit Bild), verwandte
   Überschriften kompakt darunter, jede einzeln antippbar.
@@ -38,6 +42,20 @@ Smart Launchers).
 - **Einstellungen**: Aktualisierungsintervall (15–180 min), Aufbewahrungsdauer,
   Bilder an/aus, Gruppierung an/aus
 - Unterstützt RSS 2.0, RSS 1.0 (RDF) und Atom; hell/dunkel folgt dem System
+
+## Vollbild-Reader per Kvaesitso-Geste öffnen
+
+Kvaesitso kann Wischgesten mit Aktionen belegen (Einstellungen → **Gesten**).
+Da die App direkt im Vollbild-Feed startet, genügt:
+
+1. Kvaesitso-Einstellungen → **Gesten** → gewünschte Geste (z. B.
+   *Nach links wischen*)
+2. **App starten** → **Kvaesitso RSS** auswählen
+
+Ein Wisch öffnet dann den Feed im Vollbild. Kvaesitso kann Gesten auch mit
+**App-Shortcuts** belegen – die App bringt dafür den Shortcut
+**Feeds verwalten** mit, falls eine Geste direkt in die Feed-Verwaltung
+führen soll.
 
 ## Widget in Kvaesitso einrichten
 
@@ -87,5 +105,6 @@ app/   Android-App:
        ├── settings/  DataStore-Einstellungen
        ├── fetch/     WorkManager-Sync, OkHttp, Thumbnail-Cache (≤400 px JPEG)
        ├── widget/    Glance-Widget (LazyColumn, Gruppen-Karten, Refresh)
-       └── ui/        Compose: Feed-Verwaltung, OPML, Einstellungen, Gruppen-Ansicht
+       └── ui/        Compose: Vollbild-Reader, Feed-Verwaltung, OPML,
+                      Einstellungen, Gruppen-Ansicht
 ```
