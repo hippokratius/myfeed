@@ -7,7 +7,10 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "feeds",
-    indices = [Index(value = ["url"], unique = true)],
+    indices = [
+        Index(value = ["url"], unique = true),
+        Index(value = ["category"]),
+    ],
 )
 data class FeedEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -18,6 +21,8 @@ data class FeedEntity(
     val iconUrl: String? = null,
     /** Pfad zum lokal gecachten, verkleinerten Logo. */
     val iconPath: String? = null,
+    /** Kategorie/Thema als Anzeigename, null = ohne Kategorie. */
+    val category: String? = null,
 )
 
 @Entity(

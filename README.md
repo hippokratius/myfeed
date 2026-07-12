@@ -24,19 +24,31 @@ Smart Launchers).
   (Horizontal scrollbare Listen sind in App-Widgets technisch nicht möglich,
   daher die vertikale Kompakt-Darstellung.)
 - **Tap = Browser**: Jeder Artikel öffnet direkt im Browser
+- **Feeds entdecken**: kuratierter Katalog bekannter deutsch- und
+  englischsprachiger Feeds (Tagesschau, heise, BBC, …), nach Kategorien
+  gruppiert, mit Ein-Tipp-Hinzufügen
 - **Feed-Verwaltung**: Feeds manuell per URL hinzufügen oder per
-  **OPML-Import** übernehmen
+  **OPML-Import** übernehmen (OPML-Ordner werden als Kategorien übernommen)
+- **Kategorien**: Jeder Feed kann einer Kategorie zugeordnet werden
+  (vordefiniert oder frei benannt); Filter-Chips in der Feed-Liste
+- **Widget pro Kategorie**: Jede Widget-Instanz zeigt wahlweise alle Feeds
+  oder nur eine Kategorie – z. B. ein Tech- und ein Sport-Widget auf
+  verschiedenen Launcher-Seiten (Auswahl beim Platzieren, änderbar per
+  Long-Press → Neu konfigurieren)
 - **Einstellungen**: Aktualisierungsintervall (15–180 min), Aufbewahrungsdauer,
   Bilder an/aus, Gruppierung an/aus
 - Unterstützt RSS 2.0, RSS 1.0 (RDF) und Atom; hell/dunkel folgt dem System
 
 ## Widget in Kvaesitso einrichten
 
-1. App installieren und öffnen, Feeds hinzufügen (＋ oder OPML-Import)
+1. App installieren und öffnen, Feeds hinzufügen (＋, **Feeds entdecken**
+   oder OPML-Import)
 2. In Kvaesitso auf dem Startbildschirm nach unten scrollen → **Bearbeiten**
    (Stift-Symbol) → **Widget hinzufügen**
 3. Unter **Kvaesitso RSS** das Widget **RSS-Feed** auswählen
-4. Über den Widget-Rahmen die Höhe nach Wunsch anpassen – die Liste
+4. Beim Platzieren fragt das Widget, ob es alle Feeds oder nur eine
+   Kategorie anzeigen soll
+5. Über den Widget-Rahmen die Höhe nach Wunsch anpassen – die Liste
    scrollt innerhalb des Widgets
 
 ## Build

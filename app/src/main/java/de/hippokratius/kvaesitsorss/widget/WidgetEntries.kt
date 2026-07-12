@@ -35,20 +35,25 @@ object WidgetEntries {
     const val MAX_ENTRIES = 40
     const val MAX_RELATED_SHOWN = 3
 
-    suspend fun buildData(articleDao: ArticleDao, feedDao: FeedDao): WidgetData {
+    suspend fun buildData(articleDao: ArticleDao, feedDao: FeedDao, category: String? = null): WidgetData {
         val icons = feedDao.getAll()
             .mapNotNull { feed -> feed.iconPath?.let { feed.id to it } }
             .toMap()
-        return WidgetData(build(articleDao), icons)
+        return WidgetData(build(articleDao, category), icons)
     }
 
     /**
      * Formt die neuesten Artikel in die Widget-Liste um: Artikel mit gleicher
      * groupId werden zu einer Gruppen-Karte zusammengefasst (Hauptartikel =
      * neuester, mit Bild bevorzugt), alle anderen bleiben Einzelzeilen.
+     * Mit [category] werden nur Artikel von Feeds dieser Kategorie geladen.
      */
-    suspend fun build(articleDao: ArticleDao): List<WidgetEntry> {
-        val articles = articleDao.newest(limit = 150)
+    suspend fun build(articleDao: ArticleDao, category: String? = null): List<WidgetEntry> {
+        val articles = if (category == null) {
+            articleDao.newest(limit = 150)
+        } else {
+            articleDao.newestInCategory(category, limit = 150)
+        }
         val byGroup = articles.filter { it.groupId != null }.groupBy { it.groupId!! }
         val entries = mutableListOf<WidgetEntry>()
 

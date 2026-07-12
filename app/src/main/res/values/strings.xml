@@ -30,4 +30,28 @@
     <string name="settings_grouping">Ähnliche Artikel gruppieren</string>
 
     <string name="group_title">Artikel zum Thema</string>
+
+    <string name="action_discover">Feeds entdecken</string>
+    <string name="discover_added">Hinzugefügt</string>
+    <string name="discover_language_de">Deutsch</string>
+    <string name="discover_language_en">Englisch</string>
+
+    <string name="category_news">Nachrichten</string>
+    <string name="category_tech">Technik</string>
+    <string name="category_sport">Sport</string>
+    <string name="category_science">Wissenschaft</string>
+    <string name="category_economy">Wirtschaft</string>
+    <string name="category_culture">Kultur</string>
+    <string name="category_all">Alle</string>
+    <string name="category_none">Ohne Kategorie</string>
+
+    <string name="feed_category_label">Kategorie</string>
+    <string name="feed_category_new">Neue Kategorie</string>
+    <string name="action_edit_category">Kategorie ändern</string>
+    <string name="action_save">Übernehmen</string>
+
+    <string name="widget_config_title">Widget konfigurieren</string>
+    <string name="widget_config_hint">Welche Feeds soll dieses Widget anzeigen?</string>
+    <string name="widget_config_all_categories">Alle Kategorien</string>
+    <string name="widget_no_articles_in_category">Keine Artikel in dieser Kategorie</string>
 </resources>

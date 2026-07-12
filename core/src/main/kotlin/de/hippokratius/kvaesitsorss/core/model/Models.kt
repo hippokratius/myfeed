@@ -22,4 +22,6 @@ data class ParsedFeed(
 data class OpmlFeed(
     val title: String?,
     val xmlUrl: String,
+    /** Name des umschließenden OPML-Ordners (innerster gewinnt), null ohne Ordner. */
+    val category: String? = null,
 )

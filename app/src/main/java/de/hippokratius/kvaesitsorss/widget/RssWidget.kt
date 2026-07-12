@@ -11,6 +11,7 @@ import android.text.format.DateUtils
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
@@ -24,6 +25,7 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.ActionCallback
+import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.appWidgetBackground
@@ -31,6 +33,7 @@ import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.items
 import androidx.glance.appwidget.provideContent
+import androidx.glance.appwidget.state.getAppWidgetState
 import androidx.glance.appwidget.updateAll
 import androidx.glance.background
 import androidx.glance.layout.Alignment
@@ -72,18 +75,24 @@ class RssWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val app = context.applicationContext as KvaesitsoRssApp
-        val data = WidgetEntries.buildData(app.graph.articleDao, app.graph.feedDao)
+        // Pro Widget-Instanz konfigurierte Kategorie; fehlt der Key, zeigt das Widget alles.
+        val category = getAppWidgetState(context, PreferencesGlanceStateDefinition, id)[KEY_CATEGORY]
+        val data = WidgetEntries.buildData(app.graph.articleDao, app.graph.feedDao, category)
         val settings = app.graph.settingsRepository.current()
         val bitmaps = if (settings.showImages) {
             loadBitmaps(data)
         } else {
             WidgetBitmaps(emptyMap(), emptyMap(), loadFeedIcons(data))
         }
-        val hasFeeds = app.graph.feedDao.count() > 0
+        val hasFeeds = if (category == null) {
+            app.graph.feedDao.count() > 0
+        } else {
+            app.graph.feedDao.countInCategory(category) > 0
+        }
 
         provideContent {
             GlanceTheme {
-                WidgetRoot(data.entries, bitmaps, hasFeeds, settings.lastSyncMillis)
+                WidgetRoot(data.entries, bitmaps, hasFeeds, settings.lastSyncMillis, category)
             }
         }
     }
@@ -136,6 +145,9 @@ class RssWidget : GlanceAppWidget() {
         private const val MAX_GROUPS_WITH_THUMBS = 4
         private const val MAX_FEED_ICONS = 20
 
+        /** Pro-Instanz-State: Kategorie-Filter dieses Widgets (fehlt = alle). */
+        val KEY_CATEGORY = stringPreferencesKey("widget_category")
+
         suspend fun updateAll(context: Context) {
             RssWidget().updateAll(context)
         }
@@ -150,6 +162,7 @@ private fun WidgetRoot(
     bitmaps: WidgetBitmaps,
     hasFeeds: Boolean,
     lastSyncMillis: Long,
+    category: String?,
 ) {
     var root = GlanceModifier
         .fillMaxSize()
@@ -159,9 +172,11 @@ private fun WidgetRoot(
         root = root.cornerRadius(20.dp)
     }
     Column(modifier = root.padding(horizontal = 14.dp, vertical = 10.dp)) {
-        Header(lastSyncMillis)
+        Header(lastSyncMillis, category)
         when {
+            !hasFeeds && category != null -> EmptyHint(R.string.widget_no_articles_in_category)
             !hasFeeds -> EmptyHint(R.string.widget_no_feeds)
+            entries.isEmpty() && category != null -> EmptyHint(R.string.widget_no_articles_in_category)
             entries.isEmpty() -> EmptyHint(R.string.widget_no_articles)
             else -> LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
                 items(entries, itemId = { it.itemId() }) { entry ->
@@ -187,7 +202,7 @@ private fun WidgetEntry.itemId(): Long = when (this) {
 }
 
 @Composable
-private fun Header(lastSyncMillis: Long) {
+private fun Header(lastSyncMillis: Long, category: String?) {
     val context = LocalContext.current
     Row(
         modifier = GlanceModifier.fillMaxWidth().padding(bottom = 8.dp),
@@ -195,7 +210,8 @@ private fun Header(lastSyncMillis: Long) {
     ) {
         Column(modifier = GlanceModifier.defaultWeight().clickable(openAppAction(context))) {
             Text(
-                text = context.getString(R.string.widget_label),
+                text = context.getString(R.string.widget_label) +
+                    (category?.let { " · $it" } ?: ""),
                 style = TextStyle(
                     color = GlanceTheme.colors.onSurface,
                     fontSize = 16.sp,

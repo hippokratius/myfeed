@@ -30,4 +30,28 @@
     <string name="settings_grouping">Group similar articles</string>
 
     <string name="group_title">Articles on this topic</string>
+
+    <string name="action_discover">Discover feeds</string>
+    <string name="discover_added">Added</string>
+    <string name="discover_language_de">German</string>
+    <string name="discover_language_en">English</string>
+
+    <string name="category_news">News</string>
+    <string name="category_tech">Tech</string>
+    <string name="category_sport">Sports</string>
+    <string name="category_science">Science</string>
+    <string name="category_economy">Business</string>
+    <string name="category_culture">Culture</string>
+    <string name="category_all">All</string>
+    <string name="category_none">Uncategorized</string>
+
+    <string name="feed_category_label">Category</string>
+    <string name="feed_category_new">New category</string>
+    <string name="action_edit_category">Change category</string>
+    <string name="action_save">Apply</string>
+
+    <string name="widget_config_title">Configure widget</string>
+    <string name="widget_config_hint">Which feeds should this widget show?</string>
+    <string name="widget_config_all_categories">All categories</string>
+    <string name="widget_no_articles_in_category">No articles in this category</string>
 </resources>

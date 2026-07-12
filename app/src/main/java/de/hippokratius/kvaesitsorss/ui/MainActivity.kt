@@ -48,7 +48,11 @@ class MainActivity : ComponentActivity() {
                         FeedsScreen(
                             graph = graph,
                             onOpenSettings = { navController.navigate("settings") },
+                            onOpenDiscover = { navController.navigate("discover") },
                         )
+                    }
+                    composable("discover") {
+                        DiscoverScreen(graph = graph, onBack = { navController.popBackStack() })
                     }
                     composable("settings") {
                         SettingsScreen(graph = graph, onBack = { navController.popBackStack() })
@@ -76,7 +80,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun AppTheme(content: @Composable () -> Unit) {
+internal fun AppTheme(content: @Composable () -> Unit) {
     val darkTheme = isSystemInDarkTheme()
     val context = androidx.compose.ui.platform.LocalContext.current
     val colorScheme = when {

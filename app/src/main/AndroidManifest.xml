@@ -21,6 +21,14 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".widget.WidgetConfigActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <receiver
             android:name=".widget.RssWidgetReceiver"
             android:exported="true"
