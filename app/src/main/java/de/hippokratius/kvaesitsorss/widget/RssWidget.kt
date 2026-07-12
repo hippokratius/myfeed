@@ -190,7 +190,7 @@ private fun WidgetEntry.itemId(): Long = when (this) {
 private fun Header(lastSyncMillis: Long) {
     val context = LocalContext.current
     Row(
-        modifier = GlanceModifier.fillMaxWidth().padding(bottom = 6.dp),
+        modifier = GlanceModifier.fillMaxWidth().padding(bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = GlanceModifier.defaultWeight().clickable(openAppAction(context))) {
@@ -255,11 +255,11 @@ private fun LargeArticle(
     Column(
         modifier = GlanceModifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp)
+            .padding(vertical = 12.dp)
             .clickable(openArticleAction(article.link)),
     ) {
         if (image != null) {
-            var imageModifier = GlanceModifier.fillMaxWidth().height(150.dp)
+            var imageModifier = GlanceModifier.fillMaxWidth().height(160.dp)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 imageModifier = imageModifier.cornerRadius(16.dp)
             }
@@ -269,10 +269,10 @@ private fun LargeArticle(
                 contentScale = ContentScale.Crop,
                 modifier = imageModifier,
             )
-            Spacer(modifier = GlanceModifier.height(8.dp))
+            Spacer(modifier = GlanceModifier.height(10.dp))
         }
         SourceLine(article, feedIcons)
-        Spacer(modifier = GlanceModifier.height(2.dp))
+        Spacer(modifier = GlanceModifier.height(4.dp))
         Text(
             text = article.title,
             style = TextStyle(
@@ -294,7 +294,7 @@ private fun GroupBlock(group: WidgetEntry.Group, bitmaps: WidgetBitmaps) {
 
         for (related in group.related) {
             RelatedCard(related, bitmaps.relatedThumbs[related.id], bitmaps.feedIcons)
-            Spacer(modifier = GlanceModifier.height(6.dp))
+            Spacer(modifier = GlanceModifier.height(8.dp))
         }
 
         if (group.extraCount > 0) {
@@ -331,7 +331,7 @@ private fun RelatedCard(
         card = card.cornerRadius(12.dp)
     }
     Row(
-        modifier = card.padding(10.dp).clickable(openArticleAction(article.link)),
+        modifier = card.padding(12.dp).clickable(openArticleAction(article.link)),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = GlanceModifier.defaultWeight()) {
