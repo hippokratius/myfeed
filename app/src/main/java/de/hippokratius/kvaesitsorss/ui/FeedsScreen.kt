@@ -58,6 +58,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import de.hippokratius.kvaesitsorss.AppGraph
 import de.hippokratius.kvaesitsorss.R
+import de.hippokratius.kvaesitsorss.core.catalog.FeedCatalog
 import de.hippokratius.kvaesitsorss.core.catalog.FeedUrls
 import de.hippokratius.kvaesitsorss.core.discovery.DiscoveredFeed
 import de.hippokratius.kvaesitsorss.core.opml.OpmlParser
@@ -519,6 +520,20 @@ private fun AddFeedDialog(
     val loading = step == AddFeedStep.Loading
     val suggestions = step as? AddFeedStep.Suggestions
 
+    // Beim Tippen passende Feeds aus dem eingebauten Katalog anbieten.
+    val catalogMatches = remember(url) {
+        val query = url.trim()
+            .removePrefix("https://").removePrefix("http://").removePrefix("www.")
+            .trimEnd('/')
+        if (query.length < 3) {
+            emptyList()
+        } else {
+            FeedCatalog.feeds.filter {
+                it.title.contains(query, ignoreCase = true) || it.url.contains(query, ignoreCase = true)
+            }.take(5)
+        }
+    }
+
     fun addFeed(feedUrl: String, title: String?) {
         onAdd(feedUrl, title, category.trim().ifBlank { null })
     }
@@ -548,6 +563,37 @@ private fun AddFeedDialog(
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.padding(top = 4.dp),
                         )
+                    }
+                    if (!loading && catalogMatches.isNotEmpty()) {
+                        Text(
+                            text = stringResource(R.string.feed_catalog_matches),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 240.dp)
+                                .verticalScroll(rememberScrollState()),
+                        ) {
+                            for (match in catalogMatches) {
+                                FeedSuggestionRow(
+                                    title = match.title,
+                                    subtitle = match.url,
+                                    added = FeedUrls.canonical(match.url) in addedUrls,
+                                    onAdd = {
+                                        onAdd(
+                                            match.url,
+                                            match.title,
+                                            category.trim()
+                                                .ifBlank { context.getString(match.category.labelRes()) },
+                                        )
+                                    },
+                                    modifier = Modifier.padding(vertical = 4.dp),
+                                )
+                            }
+                        }
                     }
                 } else {
                     Text(

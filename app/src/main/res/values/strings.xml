@@ -23,6 +23,7 @@
     <string name="feed_url_invalid">Feed konnte nicht geladen werden. Bitte URL prüfen.</string>
     <string name="feed_add_network_error">Seite konnte nicht geladen werden. Bitte Verbindung und URL prüfen.</string>
     <string name="feed_discovery_found">Gefundene Feeds</string>
+    <string name="feed_catalog_matches">Aus dem Katalog</string>
     <string name="feed_discovery_empty">Auf dieser Seite wurden keine Feeds gefunden.</string>
     <string name="action_close">Schließen</string>
     <string name="opml_imported">%1$d Feeds importiert</string>
@@ -42,7 +43,9 @@
     <string name="discover_language_en">Englisch</string>
 
     <string name="category_news">Nachrichten</string>
+    <string name="category_politics">Politik</string>
     <string name="category_regional">Regional</string>
+    <string name="category_gaming">Gaming</string>
     <string name="category_tech">Technik</string>
     <string name="category_sport">Sport</string>
     <string name="category_science">Wissenschaft</string>
