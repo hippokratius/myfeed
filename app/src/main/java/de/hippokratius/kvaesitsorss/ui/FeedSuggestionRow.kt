@@ -1,8 +1,10 @@
 package de.hippokratius.kvaesitsorss.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -15,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import de.hippokratius.kvaesitsorss.R
 
 /** Vorschlagszeile mit Ein-Tipp-Hinzufügen, genutzt vom Katalog und der Feed-Suche. */
@@ -45,15 +48,22 @@ fun FeedSuggestionRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        if (added) {
-            Icon(
-                Icons.Default.Check,
-                contentDescription = stringResource(R.string.discover_added),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-        } else {
-            IconButton(onClick = onAdd) {
-                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_add))
+        // Gleiche Breite wie der IconButton (48 dp), damit + und Häkchen
+        // über alle Zeilen hinweg exakt untereinander stehen.
+        Box(
+            modifier = Modifier.size(48.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (added) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = stringResource(R.string.discover_added),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            } else {
+                IconButton(onClick = onAdd) {
+                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_add))
+                }
             }
         }
     }
