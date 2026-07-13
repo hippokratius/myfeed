@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -408,9 +409,10 @@ private fun RelatedCard(
     }
 }
 
-/** Quellenzeile: kleines Feed-Logo (falls vorhanden), Name links, Zeit rechts. */
+/** Quellenzeile: kleines Feed-Logo (falls vorhanden), Name links, Zeit und Teilen rechts. */
 @Composable
 private fun SourceLine(article: ArticleEntity, iconPath: String?) {
+    val context = LocalContext.current
     val color = MaterialTheme.colorScheme.onSurfaceVariant
     val relativeTime = DateUtils.getRelativeTimeSpanString(
         article.publishedAt,
@@ -444,6 +446,17 @@ private fun SourceLine(article: ArticleEntity, iconPath: String?) {
             color = color,
             maxLines = 1,
         )
+        Spacer(modifier = Modifier.width(4.dp))
+        Icon(
+            imageVector = Icons.Default.Share,
+            contentDescription = stringResource(R.string.action_share),
+            tint = color,
+            modifier = Modifier
+                .clip(CircleShape)
+                .clickable { shareArticle(context, article) }
+                .padding(4.dp)
+                .size(16.dp),
+        )
     }
 }
 
@@ -451,4 +464,14 @@ private fun openLink(context: android.content.Context, link: String) {
     runCatching {
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
     }
+}
+
+/** Öffnet das System-Share-Sheet mit Titel und Link des Artikels. */
+internal fun shareArticle(context: android.content.Context, article: ArticleEntity) {
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, article.title)
+        putExtra(Intent.EXTRA_TEXT, "${article.title}\n${article.link}")
+    }
+    runCatching { context.startActivity(Intent.createChooser(send, null)) }
 }
