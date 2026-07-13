@@ -16,20 +16,22 @@ data class ClusterCandidate(
  *
  * 1. Titel werden tokenisiert (Kleinschreibung, Stoppwörter raus, kurze Tokens raus).
  * 2. Zwei Artikel gelten als verwandt, wenn sie innerhalb von [windowMillis]
- *    erschienen sind und eine dieser Regeln erfüllen:
- *    - Strikt (jedes Paar): mindestens [minSharedTokens] gemeinsame Schlüsselwörter
- *      und Overlap-Koeffizient (|A∩B| / min(|A|,|B|)) mindestens [minScore].
+ *    erschienen sind, mindestens [minSharedTokens] Schlüsselwörter teilen und
+ *    eine dieser Regeln erfüllen:
+ *    - Strikt (jedes Paar): Overlap-Koeffizient (|A∩B| / min(|A|,|B|))
+ *      mindestens [minScore].
  *    - Gelockert (nur Paare aus *verschiedenen* Quellen, weil verschiedene
- *      Redaktionen dieselbe Story unterschiedlich formulieren): mindestens
- *      [minSharedTokens] gemeinsame Wörter ab Overlap [crossFeedMinScore], sofern
- *      mindestens ein gemeinsames Wort im Batch selten ist (Dokumentfrequenz
- *      ≤ [crossFeedSalientMaxDf]); oder ein einzelnes gemeinsames, sehr seltenes
- *      Wort (Dokumentfrequenz ≤ [crossFeedRareMaxDf]). Die Dokumentfrequenz zählt
- *      pro Quelle höchstens [PER_SOURCE_DF_CAP] Titel, damit Ticker-Fluten einer
- *      Quelle ein Wort nicht künstlich "häufig" machen.
+ *      Redaktionen dieselbe Story unterschiedlich formulieren): Overlap ab
+ *      [crossFeedMinScore], sofern mindestens ein gemeinsames Wort im Batch
+ *      selten ist (Dokumentfrequenz ≤ [crossFeedSalientMaxDf]). Ein einzelnes
+ *      gemeinsames Wort reicht bewusst nie – das würde über Union-Find zu
+ *      Riesengruppen verketten.
  *    Wortformen werden über einen Präfix-Vergleich toleriert
  *    ("Regierung"/"Regierungen").
  * 3. Verwandtschaft wird per Union-Find transitiv zu Gruppen zusammengefasst.
+ *    Gelockerte Verbindungen werden nur angewendet, solange die entstehende
+ *    Gruppe höchstens [maxCrossFeedGroupSize] Artikel hätte – eine harte
+ *    Schranke gegen transitives Zusammenwachsen zu einer Mega-Gruppe.
  */
 class TopicClusterer(
     private val minSharedTokens: Int = 2,
@@ -37,7 +39,7 @@ class TopicClusterer(
     private val windowMillis: Long = 48L * 60 * 60 * 1000,
     private val crossFeedMinScore: Double = 0.33,
     private val crossFeedSalientMaxDf: Int = 10,
-    private val crossFeedRareMaxDf: Int = 4,
+    private val maxCrossFeedGroupSize: Int = 6,
 ) {
 
     /**
@@ -49,8 +51,9 @@ class TopicClusterer(
         if (n < 2) return emptyList()
 
         val tokens = candidates.map { tokenize(it.title) }
-        val df = documentFrequencies(candidates, tokens)
+        val df = documentFrequencies(tokens)
         val parent = IntArray(n) { it }
+        val componentSize = IntArray(n) { 1 }
 
         fun find(x: Int): Int {
             var root = x
@@ -67,7 +70,10 @@ class TopicClusterer(
         fun union(a: Int, b: Int) {
             val ra = find(a)
             val rb = find(b)
-            if (ra != rb) parent[rb] = ra
+            if (ra != rb) {
+                parent[rb] = ra
+                componentSize[ra] += componentSize[rb]
+            }
         }
 
         for (i in 0 until n) {
@@ -79,9 +85,24 @@ class TopicClusterer(
                 if (find(i) == find(j)) continue
 
                 val shared = sharedTokens(tokens[i], tokens[j], df)
-                if (shared.count < 1) continue
+                if (shared.count < minSharedTokens) continue
                 val score = shared.count.toDouble() / minOf(tokens[i].size, tokens[j].size)
-                if (relates(candidates[i], candidates[j], shared, score)) union(i, j)
+
+                if (score >= minScore) {
+                    union(i, j)
+                    continue
+                }
+
+                val crossFeed = candidates[i].sourceKey != null &&
+                    candidates[j].sourceKey != null &&
+                    candidates[i].sourceKey != candidates[j].sourceKey
+                if (crossFeed &&
+                    score >= crossFeedMinScore &&
+                    shared.rarestDf <= crossFeedSalientMaxDf &&
+                    componentSize[find(i)] + componentSize[find(j)] <= maxCrossFeedGroupSize
+                ) {
+                    union(i, j)
+                }
             }
         }
 
@@ -95,26 +116,6 @@ class TopicClusterer(
             .sortedByDescending { groupIds ->
                 candidates.first { it.id == groupIds.first() }.timestampMillis
             }
-    }
-
-    private fun relates(
-        a: ClusterCandidate,
-        b: ClusterCandidate,
-        shared: SharedTokens,
-        score: Double,
-    ): Boolean {
-        if (shared.count >= minSharedTokens && score >= minScore) return true
-
-        val crossFeed = a.sourceKey != null && b.sourceKey != null && a.sourceKey != b.sourceKey
-        if (!crossFeed) return false
-
-        if (shared.count >= minSharedTokens &&
-            score >= crossFeedMinScore &&
-            shared.rarestDf <= crossFeedSalientMaxDf
-        ) {
-            return true
-        }
-        return shared.rarestDf <= crossFeedRareMaxDf
     }
 
     /** Ergebnis des Token-Vergleichs zweier Titel. */
@@ -150,28 +151,20 @@ class TopicClusterer(
         return SharedTokens(count, rarest)
     }
 
-    /** Dokumentfrequenz je Token, gedeckelt auf [PER_SOURCE_DF_CAP] Titel pro Quelle. */
-    private fun documentFrequencies(
-        candidates: List<ClusterCandidate>,
-        tokens: List<Set<String>>,
-    ): Map<String, Int> {
-        val perSource = HashMap<String, HashMap<String?, Int>>()
-        for (i in candidates.indices) {
-            val source = candidates[i].sourceKey
-            for (token in tokens[i]) {
-                val bySource = perSource.getOrPut(token) { HashMap() }
-                bySource[source] = (bySource[source] ?: 0) + 1
+    /** Dokumentfrequenz je Token: in wie vielen Titeln des Batches kommt es vor? */
+    private fun documentFrequencies(tokens: List<Set<String>>): Map<String, Int> {
+        val df = HashMap<String, Int>()
+        for (titleTokens in tokens) {
+            for (token in titleTokens) {
+                df[token] = (df[token] ?: 0) + 1
             }
         }
-        return perSource.mapValues { (_, bySource) ->
-            bySource.values.sumOf { minOf(it, PER_SOURCE_DF_CAP) }
-        }
+        return df
     }
 
     companion object {
         private const val PREFIX_MIN_LENGTH = 5
         private const val MIN_TOKEN_LENGTH = 3
-        private const val PER_SOURCE_DF_CAP = 2
 
         private val SPLIT_REGEX = Regex("[^\\p{L}\\p{Nd}]+")
 

@@ -24,9 +24,9 @@ Smart Launchers).
 - **Themen-Gruppierung**: Artikel verschiedener Quellen zum selben Thema werden
   als Karte zusammengefasst – Hauptartikel groß (mit Bild), verwandte
   Überschriften kompakt darunter, jede einzeln antippbar. Für Artikel aus
-  verschiedenen Quellen genügen bereits wenige gemeinsame, im aktuellen
-  Nachrichtenbestand seltene Schlüsselwörter (unterschiedliche Redaktionen
-  formulieren dieselbe Story unterschiedlich).
+  verschiedenen Quellen genügen zwei gemeinsame Schlüsselwörter, sofern
+  eines davon im aktuellen Nachrichtenbestand selten ist (unterschiedliche
+  Redaktionen formulieren dieselbe Story unterschiedlich).
   „+n weitere" öffnet die vollständige Gruppen-Ansicht in der App.
   (Horizontal scrollbare Listen sind in App-Widgets technisch nicht möglich,
   daher die vertikale Kompakt-Darstellung.)
