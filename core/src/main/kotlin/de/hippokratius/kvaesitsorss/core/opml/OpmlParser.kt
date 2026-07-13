@@ -9,7 +9,8 @@ import org.w3c.dom.Node
 
 /**
  * Liest Feed-URLs aus einer OPML-Datei. Verschachtelte <outline>-Ordner werden
- * rekursiv durchlaufen; Duplikate (gleiche xmlUrl) werden entfernt.
+ * rekursiv durchlaufen und ihre Namen als Kategorie übernommen (innerster
+ * Ordner gewinnt); Duplikate (gleiche xmlUrl) werden entfernt.
  */
 object OpmlParser {
 
@@ -30,25 +31,29 @@ object OpmlParser {
         }
 
         val feeds = mutableListOf<OpmlFeed>()
-        collectOutlines(root, feeds)
+        collectOutlines(root, feeds, category = null)
         return feeds.distinctBy { it.xmlUrl }
     }
 
     fun parse(xml: String): List<OpmlFeed> = parse(xml.byteInputStream(Charsets.UTF_8))
 
-    private fun collectOutlines(element: Element, out: MutableList<OpmlFeed>) {
+    private fun collectOutlines(element: Element, out: MutableList<OpmlFeed>, category: String?) {
         var node: Node? = element.firstChild
         while (node != null) {
             if (node is Element) {
+                var childCategory = category
                 if (node.tagName.equals("outline", ignoreCase = true)) {
                     val xmlUrl = node.getAttribute("xmlUrl").trim()
+                    val label = node.getAttribute("title").ifBlank { node.getAttribute("text") }
+                        .trim().ifBlank { null }
                     if (xmlUrl.startsWith("http://") || xmlUrl.startsWith("https://")) {
-                        val title = node.getAttribute("title").ifBlank { node.getAttribute("text") }
-                            .trim().ifBlank { null }
-                        out += OpmlFeed(title, xmlUrl)
+                        out += OpmlFeed(label, xmlUrl, category)
+                    } else if (label != null) {
+                        // Outline ohne Feed-URL = Ordner: Name wird Kategorie der Kinder.
+                        childCategory = label
                     }
                 }
-                collectOutlines(node, out)
+                collectOutlines(node, out, childCategory)
             }
             node = node.nextSibling
         }

@@ -6,9 +6,21 @@ object HtmlText {
     private val TAG_REGEX = Regex("<[^>]*>")
     private val WHITESPACE_REGEX = Regex("\\s+")
     private val NUMERIC_ENTITY_REGEX = Regex("&#(x?)([0-9a-fA-F]+);")
-    private val IMG_SRC_REGEX = Regex(
-        "<img[^>]+src\\s*=\\s*[\"']([^\"']+)[\"']",
+    private val IMG_TAG_REGEX = Regex("<img[^>]*>", RegexOption.IGNORE_CASE)
+    private val SRC_ATTR_REGEX = Regex(
+        "src\\s*=\\s*[\"']([^\"']+)[\"']",
         RegexOption.IGNORE_CASE,
+    )
+    private val WIDTH_ATTR_REGEX = Regex("width\\s*=\\s*[\"']?(\\d+)", RegexOption.IGNORE_CASE)
+    private val HEIGHT_ATTR_REGEX = Regex("height\\s*=\\s*[\"']?(\\d+)", RegexOption.IGNORE_CASE)
+
+    /**
+     * Zählpixel und Werbe-Tracker, die Feeds als <img> mitliefern
+     * (Golem cpx.php, VG-Wort-Pixel, Ad-Server), aber keine Artikelbilder sind.
+     */
+    private val TRACKER_URL_MARKERS = listOf(
+        "cpx.golem.de", "/cpx.php", "vgwort.de", "doubleclick.net",
+        "feedburner.com/~ff/", "feedsportal.com", "smartadserver.com",
     )
 
     private val NAMED_ENTITIES = mapOf(
@@ -34,11 +46,27 @@ object HtmlText {
         return text.replace(WHITESPACE_REGEX, " ").trim()
     }
 
-    /** Liefert die erste Bild-URL aus einem HTML-Fragment (z. B. description). */
+    /**
+     * Liefert die erste echte Bild-URL aus einem HTML-Fragment (z. B. description).
+     * Zählpixel (bekannte Tracker-URLs oder deklarierte Größe ≤ 2 px) werden übersprungen.
+     */
     fun firstImageSrc(html: String?): String? {
         if (html.isNullOrBlank()) return null
-        val src = IMG_SRC_REGEX.find(html)?.groupValues?.get(1)?.trim()
-        return src?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
+        for (tag in IMG_TAG_REGEX.findAll(html)) {
+            val src = SRC_ATTR_REGEX.find(tag.value)?.groupValues?.get(1)?.trim() ?: continue
+            if (!src.startsWith("http://") && !src.startsWith("https://")) continue
+            if (isTrackingPixel(tag.value, src)) continue
+            return src
+        }
+        return null
+    }
+
+    private fun isTrackingPixel(imgTag: String, src: String): Boolean {
+        val srcLower = src.lowercase()
+        if (TRACKER_URL_MARKERS.any { it in srcLower }) return true
+        val width = WIDTH_ATTR_REGEX.find(imgTag)?.groupValues?.get(1)?.toIntOrNull()
+        val height = HEIGHT_ATTR_REGEX.find(imgTag)?.groupValues?.get(1)?.toIntOrNull()
+        return (width != null && width <= 2) || (height != null && height <= 2)
     }
 
     private fun decodeEntities(input: String): String {

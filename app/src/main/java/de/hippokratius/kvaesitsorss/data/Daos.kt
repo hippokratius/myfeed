@@ -36,12 +36,45 @@ interface FeedDao {
 
     @Query("UPDATE feeds SET iconUrl = :iconUrl, iconPath = :iconPath WHERE id = :id")
     suspend fun updateIcon(id: Long, iconUrl: String?, iconPath: String?)
+
+    @Query(
+        "SELECT DISTINCT category FROM feeds WHERE category IS NOT NULL AND category != '' " +
+            "ORDER BY category COLLATE NOCASE",
+    )
+    fun observeCategories(): Flow<List<String>>
+
+    @Query(
+        "SELECT DISTINCT category FROM feeds WHERE category IS NOT NULL AND category != '' " +
+            "ORDER BY category COLLATE NOCASE",
+    )
+    suspend fun getCategories(): List<String>
+
+    @Query("UPDATE feeds SET category = :category WHERE id = :id")
+    suspend fun updateCategory(id: Long, category: String?)
+
+    @Query("SELECT COUNT(*) FROM feeds WHERE category = :category")
+    suspend fun countInCategory(category: String): Int
 }
 
 @Dao
 interface ArticleDao {
     @Query("SELECT * FROM articles ORDER BY publishedAt DESC LIMIT :limit")
     suspend fun newest(limit: Int): List<ArticleEntity>
+
+    @Query("SELECT * FROM articles ORDER BY publishedAt DESC LIMIT :limit")
+    fun observeNewest(limit: Int): Flow<List<ArticleEntity>>
+
+    @Query(
+        "SELECT a.* FROM articles a JOIN feeds f ON a.feedId = f.id " +
+            "WHERE f.category = :category ORDER BY a.publishedAt DESC LIMIT :limit",
+    )
+    suspend fun newestInCategory(category: String, limit: Int): List<ArticleEntity>
+
+    @Query(
+        "SELECT a.* FROM articles a JOIN feeds f ON a.feedId = f.id " +
+            "WHERE f.category = :category ORDER BY a.publishedAt DESC LIMIT :limit",
+    )
+    fun observeNewestInCategory(category: String, limit: Int): Flow<List<ArticleEntity>>
 
     @Query("SELECT * FROM articles WHERE groupId = :groupId ORDER BY publishedAt DESC")
     fun observeGroup(groupId: String): Flow<List<ArticleEntity>>

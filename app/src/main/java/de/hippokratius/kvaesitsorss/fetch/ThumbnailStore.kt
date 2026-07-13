@@ -34,7 +34,8 @@ class ThumbnailStore(context: Context, private val client: OkHttpClient) {
 
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+            // Zählpixel und Spacer (z. B. 1×1-GIFs aus Feed-Beschreibungen) verwerfen.
+            if (bounds.outWidth < MIN_SOURCE_DIMENSION_PX || bounds.outHeight < MIN_SOURCE_DIMENSION_PX) return null
 
             var sampleSize = 1
             while (
@@ -125,6 +126,7 @@ class ThumbnailStore(context: Context, private val client: OkHttpClient) {
     companion object {
         private const val MAX_DOWNLOAD_BYTES = 8 * 1024 * 1024
         private const val MAX_DIMENSION_PX = 400
+        private const val MIN_SOURCE_DIMENSION_PX = 48
         private const val ICON_DIMENSION_PX = 64
         private const val JPEG_QUALITY = 85
     }

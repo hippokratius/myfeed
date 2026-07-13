@@ -24,31 +24,47 @@ import java.net.URLEncoder
 
 class MainActivity : ComponentActivity() {
 
-    private var pendingGroupId by mutableStateOf<String?>(null)
+    private var pendingRoute by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        pendingGroupId = intent?.getStringExtra(EXTRA_GROUP_ID)
+        pendingRoute = routeFor(intent)
 
         val graph = (application as KvaesitsoRssApp).graph
         setContent {
             AppTheme {
                 val navController = rememberNavController()
 
-                LaunchedEffect(pendingGroupId) {
-                    pendingGroupId?.let { groupId ->
-                        navController.navigate("group/${URLEncoder.encode(groupId, "UTF-8")}")
-                        pendingGroupId = null
+                LaunchedEffect(pendingRoute) {
+                    pendingRoute?.let { route ->
+                        navController.navigate(route)
+                        pendingRoute = null
                     }
                 }
 
-                NavHost(navController = navController, startDestination = "feeds") {
+                NavHost(navController = navController, startDestination = "reader") {
+                    composable("reader") {
+                        ReaderScreen(
+                            graph = graph,
+                            onOpenFeeds = { navController.navigate("feeds") },
+                            onOpenDiscover = { navController.navigate("discover") },
+                            onOpenSettings = { navController.navigate("settings") },
+                            onOpenGroup = { groupId ->
+                                navController.navigate("group/${URLEncoder.encode(groupId, "UTF-8")}")
+                            },
+                        )
+                    }
                     composable("feeds") {
                         FeedsScreen(
                             graph = graph,
+                            onBack = { navController.popBackStack() },
                             onOpenSettings = { navController.navigate("settings") },
+                            onOpenDiscover = { navController.navigate("discover") },
                         )
+                    }
+                    composable("discover") {
+                        DiscoverScreen(graph = graph, onBack = { navController.popBackStack() })
                     }
                     composable("settings") {
                         SettingsScreen(graph = graph, onBack = { navController.popBackStack() })
@@ -67,16 +83,29 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent.getStringExtra(EXTRA_GROUP_ID)?.let { pendingGroupId = it }
+        routeFor(intent)?.let { pendingRoute = it }
+    }
+
+    /** Ziel-Route aus dem Start-Intent: Themen-Gruppe (Widget) oder Screen (App-Shortcut). */
+    private fun routeFor(intent: Intent?): String? {
+        intent?.getStringExtra(EXTRA_GROUP_ID)?.let { groupId ->
+            return "group/${URLEncoder.encode(groupId, "UTF-8")}"
+        }
+        return when (intent?.getStringExtra(EXTRA_SCREEN)) {
+            SCREEN_FEEDS -> "feeds"
+            else -> null
+        }
     }
 
     companion object {
         const val EXTRA_GROUP_ID = "de.hippokratius.kvaesitsorss.extra.GROUP_ID"
+        const val EXTRA_SCREEN = "de.hippokratius.kvaesitsorss.extra.SCREEN"
+        const val SCREEN_FEEDS = "feeds"
     }
 }
 
 @Composable
-private fun AppTheme(content: @Composable () -> Unit) {
+internal fun AppTheme(content: @Composable () -> Unit) {
     val darkTheme = isSystemInDarkTheme()
     val context = androidx.compose.ui.platform.LocalContext.current
     val colorScheme = when {

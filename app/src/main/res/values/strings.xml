@@ -18,8 +18,14 @@
     <string name="action_back">Zurück</string>
 
     <string name="feeds_empty_hint">Noch keine Feeds. Füge mit dem +-Button eine Feed-URL hinzu oder importiere eine OPML-Datei über das Menü.</string>
-    <string name="feed_url_label">Feed-URL</string>
+    <string name="feed_url_or_site_label">Feed- oder Website-URL</string>
+    <string name="feed_url_placeholder">z. B. zdf.de oder https://…/feed</string>
     <string name="feed_url_invalid">Feed konnte nicht geladen werden. Bitte URL prüfen.</string>
+    <string name="feed_add_network_error">Seite konnte nicht geladen werden. Bitte Verbindung und URL prüfen.</string>
+    <string name="feed_discovery_found">Gefundene Feeds</string>
+    <string name="feed_catalog_matches">Aus dem Katalog</string>
+    <string name="feed_discovery_empty">Auf dieser Seite wurden keine Feeds gefunden.</string>
+    <string name="action_close">Schließen</string>
     <string name="opml_imported">%1$d Feeds importiert</string>
 
     <string name="settings_refresh_interval">Aktualisierungsintervall</string>
@@ -30,4 +36,39 @@
     <string name="settings_grouping">Ähnliche Artikel gruppieren</string>
 
     <string name="group_title">Artikel zum Thema</string>
+
+    <string name="action_discover">Feeds entdecken</string>
+    <string name="discover_added">Hinzugefügt</string>
+    <string name="discover_language_de">Deutsch</string>
+    <string name="discover_language_en">Englisch</string>
+
+    <string name="category_news">Nachrichten</string>
+    <string name="category_politics">Politik</string>
+    <string name="category_regional">Regional</string>
+    <string name="category_gaming">Gaming</string>
+    <string name="category_tech">Technik</string>
+    <string name="category_sport">Sport</string>
+    <string name="category_science">Wissenschaft</string>
+    <string name="category_economy">Wirtschaft</string>
+    <string name="category_culture">Kultur</string>
+    <string name="category_all">Alle</string>
+    <string name="category_none">Ohne Kategorie</string>
+    <string name="category_header_count">%1$s (%2$d)</string>
+
+    <string name="feed_delete_confirm_title">Feed löschen?</string>
+    <string name="feed_delete_confirm_message">„%1$s“ und alle zugehörigen Artikel werden entfernt.</string>
+
+    <string name="feed_category_label">Kategorie</string>
+    <string name="feed_category_new">Neue Kategorie</string>
+    <string name="action_edit_category">Kategorie ändern</string>
+    <string name="action_save">Übernehmen</string>
+
+    <string name="widget_config_title">Widget konfigurieren</string>
+    <string name="widget_config_hint">Welche Feeds soll dieses Widget anzeigen?</string>
+    <string name="widget_config_all_categories">Alle Kategorien</string>
+    <string name="widget_no_articles_in_category">Keine Artikel in dieser Kategorie</string>
+
+    <string name="reader_title">Dein Feed</string>
+    <string name="action_manage_feeds">Feeds verwalten</string>
+    <string name="shortcut_feeds_short">Feeds</string>
 </resources>

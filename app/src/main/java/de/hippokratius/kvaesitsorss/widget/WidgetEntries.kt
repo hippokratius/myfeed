@@ -4,13 +4,17 @@ import de.hippokratius.kvaesitsorss.data.ArticleDao
 import de.hippokratius.kvaesitsorss.data.ArticleEntity
 import de.hippokratius.kvaesitsorss.data.FeedDao
 
-/** Anzeigemodell des Widgets: Einzelartikel oder Themen-Gruppe. */
+/** Anzeigemodell für Widget und App-Reader: Einzelartikel oder Themen-Gruppe. */
 sealed interface WidgetEntry {
     /** Neuester Zeitstempel, nach dem sortiert wird. */
     val sortKey: Long
 
+    /** Stabile ID für Lazy-Listen; Gruppen negativ, damit kollisionsfrei zu Artikel-IDs. */
+    val stableId: Long
+
     data class Single(val article: ArticleEntity) : WidgetEntry {
         override val sortKey: Long get() = article.publishedAt
+        override val stableId: Long get() = article.id
     }
 
     data class Group(
@@ -20,6 +24,7 @@ sealed interface WidgetEntry {
         val extraCount: Int,
     ) : WidgetEntry {
         override val sortKey: Long get() = main.publishedAt
+        override val stableId: Long get() = -(main.id + 1)
     }
 }
 
@@ -34,21 +39,38 @@ object WidgetEntries {
 
     const val MAX_ENTRIES = 40
     const val MAX_RELATED_SHOWN = 3
+    const val SOURCE_LIMIT = 150
 
-    suspend fun buildData(articleDao: ArticleDao, feedDao: FeedDao): WidgetData {
+    suspend fun buildData(articleDao: ArticleDao, feedDao: FeedDao, category: String? = null): WidgetData {
         val icons = feedDao.getAll()
             .mapNotNull { feed -> feed.iconPath?.let { feed.id to it } }
             .toMap()
-        return WidgetData(build(articleDao), icons)
+        return WidgetData(build(articleDao, category), icons)
     }
 
     /**
-     * Formt die neuesten Artikel in die Widget-Liste um: Artikel mit gleicher
-     * groupId werden zu einer Gruppen-Karte zusammengefasst (Hauptartikel =
-     * neuester, mit Bild bevorzugt), alle anderen bleiben Einzelzeilen.
+     * Lädt die neuesten Artikel und formt sie in die Widget-Liste um.
+     * Mit [category] werden nur Artikel von Feeds dieser Kategorie geladen.
      */
-    suspend fun build(articleDao: ArticleDao): List<WidgetEntry> {
-        val articles = articleDao.newest(limit = 150)
+    suspend fun build(articleDao: ArticleDao, category: String? = null): List<WidgetEntry> {
+        val articles = if (category == null) {
+            articleDao.newest(limit = SOURCE_LIMIT)
+        } else {
+            articleDao.newestInCategory(category, limit = SOURCE_LIMIT)
+        }
+        return fromArticles(articles)
+    }
+
+    /**
+     * Formt Artikel in die Anzeige-Liste um: Artikel mit gleicher groupId
+     * werden zu einer Gruppen-Karte zusammengefasst (Hauptartikel = neuester,
+     * mit Bild bevorzugt), alle anderen bleiben Einzelzeilen. [maxRelated]
+     * begrenzt die direkt sichtbaren verwandten Artikel je Gruppe.
+     */
+    fun fromArticles(
+        articles: List<ArticleEntity>,
+        maxRelated: Int = MAX_RELATED_SHOWN,
+    ): List<WidgetEntry> {
         val byGroup = articles.filter { it.groupId != null }.groupBy { it.groupId!! }
         val entries = mutableListOf<WidgetEntry>()
 
@@ -63,8 +85,8 @@ object WidgetEntries {
             entries += WidgetEntry.Group(
                 groupId = groupId,
                 main = main,
-                related = related.take(MAX_RELATED_SHOWN),
-                extraCount = (related.size - MAX_RELATED_SHOWN).coerceAtLeast(0),
+                related = related.take(maxRelated),
+                extraCount = (related.size - maxRelated).coerceAtLeast(0),
             )
         }
 

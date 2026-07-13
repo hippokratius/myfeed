@@ -17,26 +17,59 @@ Smart Launchers).
 
 - **Scrollbares Feed-Widget**: Überschriften mit Quelle und relativer Zeit,
   Thumbnails, wo der Feed Bilder liefert
+- **Vollbild-Reader in der App**: Die App startet direkt im Feed – gleiche
+  Inhalte wie das Widget, aber mit großen Bildern, Kategorie-Filter-Chips
+  und Pull-to-Refresh. Verwandte Artikel einer Themen-Gruppe sind hier als
+  **horizontal scrollbare Karten-Reihe** zu sehen
 - **Themen-Gruppierung**: Artikel verschiedener Quellen zum selben Thema werden
   als Karte zusammengefasst – Hauptartikel groß (mit Bild), verwandte
-  Überschriften kompakt darunter, jede einzeln antippbar.
+  Überschriften kompakt darunter, jede einzeln antippbar. Für Artikel aus
+  verschiedenen Quellen genügen zwei gemeinsame Schlüsselwörter, sofern
+  eines davon im aktuellen Nachrichtenbestand selten ist (unterschiedliche
+  Redaktionen formulieren dieselbe Story unterschiedlich).
   „+n weitere" öffnet die vollständige Gruppen-Ansicht in der App.
   (Horizontal scrollbare Listen sind in App-Widgets technisch nicht möglich,
   daher die vertikale Kompakt-Darstellung.)
 - **Tap = Browser**: Jeder Artikel öffnet direkt im Browser
+- **Feeds entdecken**: kuratierter Katalog bekannter deutsch- und
+  englischsprachiger Feeds (Tagesschau, heise, BBC, …), nach Kategorien
+  gruppiert, mit Ein-Tipp-Hinzufügen
 - **Feed-Verwaltung**: Feeds manuell per URL hinzufügen oder per
-  **OPML-Import** übernehmen
+  **OPML-Import** übernehmen (OPML-Ordner werden als Kategorien übernommen)
+- **Kategorien**: Jeder Feed kann einer Kategorie zugeordnet werden
+  (vordefiniert oder frei benannt); Filter-Chips in der Feed-Liste
+- **Widget pro Kategorie**: Jede Widget-Instanz zeigt wahlweise alle Feeds
+  oder nur eine Kategorie – z. B. ein Tech- und ein Sport-Widget auf
+  verschiedenen Launcher-Seiten (Auswahl beim Platzieren, änderbar per
+  Long-Press → Neu konfigurieren)
 - **Einstellungen**: Aktualisierungsintervall (15–180 min), Aufbewahrungsdauer,
   Bilder an/aus, Gruppierung an/aus
 - Unterstützt RSS 2.0, RSS 1.0 (RDF) und Atom; hell/dunkel folgt dem System
 
+## Vollbild-Reader per Kvaesitso-Geste öffnen
+
+Kvaesitso kann Wischgesten mit Aktionen belegen (Einstellungen → **Gesten**).
+Da die App direkt im Vollbild-Feed startet, genügt:
+
+1. Kvaesitso-Einstellungen → **Gesten** → gewünschte Geste (z. B.
+   *Nach links wischen*)
+2. **App starten** → **Kvaesitso RSS** auswählen
+
+Ein Wisch öffnet dann den Feed im Vollbild. Kvaesitso kann Gesten auch mit
+**App-Shortcuts** belegen – die App bringt dafür den Shortcut
+**Feeds verwalten** mit, falls eine Geste direkt in die Feed-Verwaltung
+führen soll.
+
 ## Widget in Kvaesitso einrichten
 
-1. App installieren und öffnen, Feeds hinzufügen (＋ oder OPML-Import)
+1. App installieren und öffnen, Feeds hinzufügen (＋, **Feeds entdecken**
+   oder OPML-Import)
 2. In Kvaesitso auf dem Startbildschirm nach unten scrollen → **Bearbeiten**
    (Stift-Symbol) → **Widget hinzufügen**
 3. Unter **Kvaesitso RSS** das Widget **RSS-Feed** auswählen
-4. Über den Widget-Rahmen die Höhe nach Wunsch anpassen – die Liste
+4. Beim Platzieren fragt das Widget, ob es alle Feeds oder nur eine
+   Kategorie anzeigen soll
+5. Über den Widget-Rahmen die Höhe nach Wunsch anpassen – die Liste
    scrollt innerhalb des Widgets
 
 ## Build
@@ -75,5 +108,6 @@ app/   Android-App:
        ├── settings/  DataStore-Einstellungen
        ├── fetch/     WorkManager-Sync, OkHttp, Thumbnail-Cache (≤400 px JPEG)
        ├── widget/    Glance-Widget (LazyColumn, Gruppen-Karten, Refresh)
-       └── ui/        Compose: Feed-Verwaltung, OPML, Einstellungen, Gruppen-Ansicht
+       └── ui/        Compose: Vollbild-Reader, Feed-Verwaltung, OPML,
+                      Einstellungen, Gruppen-Ansicht
 ```
