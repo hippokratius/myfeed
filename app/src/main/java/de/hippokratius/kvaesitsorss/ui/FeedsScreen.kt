@@ -10,14 +10,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
@@ -56,9 +59,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import de.hippokratius.kvaesitsorss.AppGraph
 import de.hippokratius.kvaesitsorss.R
+import de.hippokratius.kvaesitsorss.core.catalog.FeedUrls
+import de.hippokratius.kvaesitsorss.core.discovery.DiscoveredFeed
 import de.hippokratius.kvaesitsorss.core.opml.OpmlParser
 import de.hippokratius.kvaesitsorss.data.FeedEntity
 import de.hippokratius.kvaesitsorss.fetch.FeedFetchWorker
+import de.hippokratius.kvaesitsorss.fetch.FeedResolution
+import java.io.IOException
 import java.text.Collator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -263,9 +270,11 @@ fun FeedsScreen(
     }
 
     if (showAddDialog) {
+        val addedUrls = remember(feeds) { feeds.map { FeedUrls.canonical(it.url) }.toSet() }
         AddFeedDialog(
             graph = graph,
             categories = categories,
+            addedUrls = addedUrls,
             onDismiss = { showAddDialog = false },
         )
     }
@@ -477,42 +486,74 @@ private fun CategoryOptionRow(
     }
 }
 
+/** Schritte des "Feed hinzufügen"-Dialogs. */
+private sealed interface AddFeedStep {
+    data object Input : AddFeedStep
+    data object Loading : AddFeedStep
+    data class Suggestions(val feeds: List<DiscoveredFeed>) : AddFeedStep
+}
+
 @Composable
 private fun AddFeedDialog(
     graph: AppGraph,
     categories: List<String>,
+    addedUrls: Set<String>,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var url by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("") }
-    var loading by remember { mutableStateOf(false) }
+    var step by remember { mutableStateOf<AddFeedStep>(AddFeedStep.Input) }
     var error by remember { mutableStateOf<String?>(null) }
+
+    val loading = step == AddFeedStep.Loading
+    val suggestions = step as? AddFeedStep.Suggestions
+
+    fun addFeed(feedUrl: String, title: String?) {
+        scope.launch {
+            graph.feedDao.insert(
+                FeedEntity(
+                    url = feedUrl,
+                    title = title.orEmpty(),
+                    category = category.trim().ifBlank { null },
+                ),
+            )
+            FeedFetchWorker.syncNow(context)
+        }
+    }
 
     AlertDialog(
         onDismissRequest = { if (!loading) onDismiss() },
         title = { Text(stringResource(R.string.action_add_feed)) },
         text = {
             Column {
-                OutlinedTextField(
-                    value = url,
-                    onValueChange = {
-                        url = it
-                        error = null
-                    },
-                    label = { Text(stringResource(R.string.feed_url_label)) },
-                    placeholder = { Text("https://…") },
-                    singleLine = true,
-                    isError = error != null,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                if (error != null) {
+                if (suggestions == null) {
+                    OutlinedTextField(
+                        value = url,
+                        onValueChange = {
+                            url = it
+                            error = null
+                        },
+                        label = { Text(stringResource(R.string.feed_url_or_site_label)) },
+                        placeholder = { Text(stringResource(R.string.feed_url_placeholder)) },
+                        singleLine = true,
+                        isError = error != null,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (error != null) {
+                        Text(
+                            text = error.orEmpty(),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                } else {
                     Text(
-                        text = error.orEmpty(),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 4.dp),
+                        text = stringResource(R.string.feed_discovery_found),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
                 OutlinedTextField(
@@ -543,45 +584,129 @@ private fun AddFeedDialog(
                         CircularProgressIndicator(modifier = Modifier.padding(4.dp))
                     }
                 }
+                if (suggestions != null) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                            .heightIn(max = 320.dp)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        for (candidate in suggestions.feeds) {
+                            DiscoveredFeedRow(
+                                candidate = candidate,
+                                added = FeedUrls.canonical(candidate.url) in addedUrls,
+                                onAdd = { addFeed(candidate.url, candidate.title) },
+                            )
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
-            TextButton(
-                enabled = !loading && url.isNotBlank(),
-                onClick = {
-                    val normalized = url.trim().let {
-                        if (it.startsWith("http://") || it.startsWith("https://")) it else "https://$it"
-                    }
-                    loading = true
-                    scope.launch {
-                        val parsed = runCatching { graph.feedSyncer.probe(normalized) }
-                        loading = false
-                        parsed.fold(
-                            onSuccess = { feed ->
-                                graph.feedDao.insert(
-                                    FeedEntity(
-                                        url = normalized,
-                                        title = feed.title.orEmpty(),
-                                        category = category.trim().ifBlank { null },
-                                    ),
-                                )
-                                FeedFetchWorker.syncNow(context)
-                                onDismiss()
-                            },
-                            onFailure = {
-                                error = context.getString(R.string.feed_url_invalid)
-                            },
-                        )
-                    }
-                },
-            ) {
-                Text(stringResource(R.string.action_add))
+            if (suggestions != null) {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.action_close))
+                }
+            } else {
+                TextButton(
+                    enabled = !loading && url.isNotBlank(),
+                    onClick = {
+                        val normalized = url.trim().let {
+                            if (it.startsWith("http://") || it.startsWith("https://")) it else "https://$it"
+                        }
+                        step = AddFeedStep.Loading
+                        scope.launch {
+                            runCatching { graph.feedSyncer.resolveFeedInput(normalized) }.fold(
+                                onSuccess = { resolution ->
+                                    when (resolution) {
+                                        is FeedResolution.Direct -> {
+                                            graph.feedDao.insert(
+                                                FeedEntity(
+                                                    url = normalized,
+                                                    title = resolution.feed.title.orEmpty(),
+                                                    category = category.trim().ifBlank { null },
+                                                ),
+                                            )
+                                            FeedFetchWorker.syncNow(context)
+                                            onDismiss()
+                                        }
+                                        is FeedResolution.Discovered -> {
+                                            step = AddFeedStep.Suggestions(resolution.candidates)
+                                        }
+                                        FeedResolution.NoFeedsFound -> {
+                                            step = AddFeedStep.Input
+                                            error = context.getString(R.string.feed_discovery_empty)
+                                        }
+                                    }
+                                },
+                                onFailure = { throwable ->
+                                    step = AddFeedStep.Input
+                                    error = context.getString(
+                                        if (throwable is IOException) {
+                                            R.string.feed_add_network_error
+                                        } else {
+                                            R.string.feed_url_invalid
+                                        },
+                                    )
+                                },
+                            )
+                        }
+                    },
+                ) {
+                    Text(stringResource(R.string.action_add))
+                }
             }
         },
         dismissButton = {
-            TextButton(enabled = !loading, onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
+            if (suggestions != null) {
+                TextButton(onClick = { step = AddFeedStep.Input }) {
+                    Text(stringResource(R.string.action_back))
+                }
+            } else {
+                TextButton(enabled = !loading, onClick = onDismiss) {
+                    Text(stringResource(R.string.action_cancel))
+                }
             }
         },
     )
+}
+
+@Composable
+private fun DiscoveredFeedRow(
+    candidate: DiscoveredFeed,
+    added: Boolean,
+    onAdd: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = candidate.title ?: candidate.url,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = candidate.url,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (added) {
+            Icon(
+                Icons.Default.Check,
+                contentDescription = stringResource(R.string.discover_added),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        } else {
+            IconButton(onClick = onAdd) {
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_add))
+            }
+        }
+    }
 }

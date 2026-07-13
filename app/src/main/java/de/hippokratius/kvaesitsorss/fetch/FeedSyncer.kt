@@ -2,6 +2,9 @@ package de.hippokratius.kvaesitsorss.fetch
 
 import android.content.Context
 import android.util.Log
+import de.hippokratius.kvaesitsorss.core.catalog.FeedUrls
+import de.hippokratius.kvaesitsorss.core.discovery.DiscoveredFeed
+import de.hippokratius.kvaesitsorss.core.discovery.FeedLinkFinder
 import de.hippokratius.kvaesitsorss.core.grouping.ClusterCandidate
 import de.hippokratius.kvaesitsorss.core.grouping.TopicClusterer
 import de.hippokratius.kvaesitsorss.core.model.ParsedFeed
@@ -12,6 +15,7 @@ import de.hippokratius.kvaesitsorss.data.FeedDao
 import de.hippokratius.kvaesitsorss.data.FeedEntity
 import de.hippokratius.kvaesitsorss.settings.SettingsRepository
 import de.hippokratius.kvaesitsorss.widget.RssWidget
+import java.io.ByteArrayInputStream
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -19,6 +23,18 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+
+/** Ergebnis der Auflösung einer Nutzereingabe im "Feed hinzufügen"-Dialog. */
+sealed class FeedResolution {
+    /** Die eingegebene URL ist selbst ein Feed. */
+    data class Direct(val url: String, val feed: ParsedFeed) : FeedResolution()
+
+    /** Die URL ist eine HTML-Seite mit mindestens einem verifizierten Feed. */
+    data class Discovered(val candidates: List<DiscoveredFeed>) : FeedResolution()
+
+    /** Seite geladen, aber kein funktionierender Feed gefunden. */
+    data object NoFeedsFound : FeedResolution()
+}
 
 /**
  * Kern der Aktualisierung: lädt alle aktiven Feeds, aktualisiert die Datenbank,
@@ -44,6 +60,60 @@ class FeedSyncer(
     /** Lädt einen Feed zur Validierung und liefert dessen Titel. */
     suspend fun probe(url: String): ParsedFeed = withContext(Dispatchers.IO) {
         fetchAndParse(url)
+    }
+
+    /**
+     * Löst eine Nutzereingabe auf: Ist [url] selbst ein Feed, kommt [FeedResolution.Direct]
+     * zurück. Ist es eine HTML-Seite, werden dort verlinkte Feeds gesucht (Fallback:
+     * gängige Pfade wie /feed), einzeln verifiziert und als Vorschläge geliefert.
+     * Wirft IOException bei Netzwerkfehlern, IllegalArgumentException bei kaputter URL.
+     */
+    suspend fun resolveFeedInput(url: String): FeedResolution = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", USER_AGENT)
+            .header(
+                "Accept",
+                "application/rss+xml, application/atom+xml, application/xml, text/xml, text/html, */*",
+            )
+            .build()
+
+        val (bytes, charset, finalUrl) = httpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw java.io.IOException("HTTP ${response.code} für $url")
+            }
+            val body = response.body ?: throw java.io.IOException("Leere Antwort für $url")
+            Triple(
+                body.bytes(),
+                body.contentType()?.charset() ?: Charsets.UTF_8,
+                response.request.url.toString(),
+            )
+        }
+
+        // Weiche nach Inhalt, nicht nach Content-Type: manche Feeds kommen als text/html.
+        val direct = runCatching { RssXmlParser.parse(ByteArrayInputStream(bytes)) }.getOrNull()
+        if (direct != null) {
+            return@withContext FeedResolution.Direct(url, direct)
+        }
+
+        val candidates = FeedLinkFinder.find(String(bytes, charset), finalUrl)
+            .ifEmpty { FeedLinkFinder.commonFeedPaths(finalUrl).map { DiscoveredFeed(it) } }
+
+        val verified = mutableListOf<DiscoveredFeed>()
+        val seenUrls = mutableSetOf<String>()
+        val seenContent = mutableSetOf<String>()
+        for (candidate in candidates) {
+            if (!seenUrls.add(FeedUrls.canonical(candidate.url))) continue
+            val parsed = runCatching { fetchAndParse(candidate.url) }.getOrNull() ?: continue
+            // Alias-Pfade (z. B. /rss als Redirect auf /rss.xml) nur einmal vorschlagen.
+            val signature = parsed.items.firstOrNull()?.guid?.ifBlank { null }
+                ?: parsed.title
+                ?: candidate.url
+            if (!seenContent.add(signature)) continue
+            verified += DiscoveredFeed(candidate.url, candidate.title ?: parsed.title)
+        }
+
+        if (verified.isEmpty()) FeedResolution.NoFeedsFound else FeedResolution.Discovered(verified)
     }
 
     suspend fun syncAll() = withContext(Dispatchers.IO) {
