@@ -31,11 +31,11 @@ fun FeedSuggestionRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
+            // Titel dürfen umbrechen: Bei "Blog » Mobile Feed" u. Ä. sitzt genau
+            // der unterscheidende Teil am Ende und darf nicht abgeschnitten werden.
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = subtitle,
