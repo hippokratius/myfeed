@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -110,6 +111,13 @@ private fun ArticleRow(article: ArticleEntity) {
                     .padding(start = 12.dp)
                     .size(56.dp)
                     .clip(RoundedCornerShape(8.dp)),
+            )
+        }
+        IconButton(onClick = { shareArticle(context, article) }) {
+            Icon(
+                imageVector = Icons.Default.Share,
+                contentDescription = stringResource(R.string.action_share),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

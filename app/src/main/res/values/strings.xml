@@ -16,6 +16,7 @@
     <string name="action_cancel">Abbrechen</string>
     <string name="action_delete">Löschen</string>
     <string name="action_back">Zurück</string>
+    <string name="action_share">Artikel teilen</string>
 
     <string name="feeds_empty_hint">Noch keine Feeds. Füge mit dem +-Button eine Feed-URL hinzu oder importiere eine OPML-Datei über das Menü.</string>
     <string name="feed_url_or_site_label">Feed- oder Website-URL</string>

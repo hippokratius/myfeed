@@ -16,6 +16,7 @@
     <string name="action_cancel">Cancel</string>
     <string name="action_delete">Delete</string>
     <string name="action_back">Back</string>
+    <string name="action_share">Share article</string>
 
     <string name="feeds_empty_hint">No feeds yet. Add a feed URL with the + button or import an OPML file from the menu.</string>
     <string name="feed_url_or_site_label">Feed or website URL</string>
