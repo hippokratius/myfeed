@@ -240,7 +240,7 @@ class FeedSyncer(
         if (!enabled) return
 
         val candidates = articleDao.newest(GROUPING_ARTICLE_LIMIT).map {
-            ClusterCandidate(it.id, it.title, it.publishedAt)
+            ClusterCandidate(it.id, it.title, it.publishedAt, sourceKey = it.feedId.toString())
         }
         for (group in clusterer.cluster(candidates)) {
             // Stabil genug: Gruppen-ID aus der kleinsten Artikel-ID der Gruppe.

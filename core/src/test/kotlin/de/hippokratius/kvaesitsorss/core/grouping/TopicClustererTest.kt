@@ -112,6 +112,112 @@ class TopicClustererTest {
     }
 
     @Test
+    fun `groups cross-source headlines with two salient shared tokens below strict overlap`() {
+        // A/B teilen {klimapaket, streit} → Score 2/5 = 0.4 (strikt: zu wenig).
+        // Die Füller heben die Dokumentfrequenz beider Tokens auf 5, sodass nur
+        // die Salient-Regel (nicht die Rare-Single-Regel) greifen kann.
+        val groups = clusterer.cluster(
+            listOf(
+                ClusterCandidate(1, "Bundesregierung einigt sich nach langem Streit auf Klimapaket", hoursAgo(1), "tagesschau"),
+                ClusterCandidate(2, "Klimapaket kommt: Koalition beendet Streit über Finanzierung der Maßnahmen", hoursAgo(3), "spiegel"),
+                ClusterCandidate(3, "Klimapaket stößt bei Wirtschaft auf Skepsis", hoursAgo(2), "f1"),
+                ClusterCandidate(4, "Kommentar: Warum das Klimapaket enttäuscht", hoursAgo(4), "f2"),
+                ClusterCandidate(5, "Klimapaket im Faktencheck", hoursAgo(5), "f3"),
+                ClusterCandidate(6, "Streit um Erbschaft eskaliert vor Gericht", hoursAgo(6), "f4"),
+                ClusterCandidate(7, "Tarifverhandlungen: Streit dauert an", hoursAgo(7), "f5"),
+                ClusterCandidate(8, "Streit im Stadtrat um Radwege", hoursAgo(8), "f6"),
+            ),
+        )
+
+        assertEquals(1, groups.size)
+        assertEquals(listOf(1L, 2L), groups.single())
+    }
+
+    @Test
+    fun `groups cross-source headlines sharing a single rare token`() {
+        // Nur "preiserhöhung" ist geteilt ("bahn"/"bahnfahren" liegt unter dem
+        // Präfix-Minimum) – quellenübergreifend reicht das bei seltenem Token.
+        val groups = clusterer.cluster(
+            listOf(
+                ClusterCandidate(1, "Bahn kündigt massive Preiserhöhung zum Fahrplanwechsel an", hoursAgo(1), "heise"),
+                ClusterCandidate(2, "Bahnfahren wird teurer: Preiserhöhung im Dezember beschlossen", hoursAgo(4), "zeit"),
+            ),
+        )
+        assertEquals(1, groups.size)
+        assertEquals(listOf(1L, 2L), groups.single())
+    }
+
+    @Test
+    fun `relaxed rules do not apply within the same source`() {
+        val groups = clusterer.cluster(
+            listOf(
+                ClusterCandidate(1, "Bahn kündigt massive Preiserhöhung zum Fahrplanwechsel an", hoursAgo(1), "heise"),
+                ClusterCandidate(2, "Bahnfahren wird teurer: Preiserhöhung im Dezember beschlossen", hoursAgo(4), "heise"),
+            ),
+        )
+        assertTrue(groups.isEmpty())
+    }
+
+    @Test
+    fun `relaxed rules do not apply without source information`() {
+        val groups = clusterer.cluster(
+            listOf(
+                ClusterCandidate(1, "Bahn kündigt massive Preiserhöhung zum Fahrplanwechsel an", hoursAgo(1)),
+                ClusterCandidate(2, "Bahnfahren wird teurer: Preiserhöhung im Dezember beschlossen", hoursAgo(4)),
+            ),
+        )
+        assertTrue(groups.isEmpty())
+    }
+
+    @Test
+    fun `frequent shared token does not chain articles into a mega group`() {
+        // "trump" steckt in allen 8 Titeln (Dokumentfrequenz 8 > Rare-Schwelle);
+        // ein einzelnes häufiges Wort darf keine Gruppe verketten.
+        val groups = clusterer.cluster(
+            listOf(
+                ClusterCandidate(1, "Trump kündigt neue Zölle gegen Mexiko an", hoursAgo(1), "s1"),
+                ClusterCandidate(2, "Trump besucht Automesse in Detroit", hoursAgo(2), "s1"),
+                ClusterCandidate(3, "Trump droht Notenbank mit Umbau", hoursAgo(3), "s2"),
+                ClusterCandidate(4, "Golfturnier: Trump eröffnet Anlage in Schottland", hoursAgo(4), "s2"),
+                ClusterCandidate(5, "Trump empfängt Staatschefs zum Gipfel", hoursAgo(5), "s3"),
+                ClusterCandidate(6, "Umfrage sieht Trump im Aufwind", hoursAgo(6), "s3"),
+                ClusterCandidate(7, "Trump verschiebt Entscheidung zu Handelsabkommen", hoursAgo(7), "s4"),
+                ClusterCandidate(8, "Buch über Trump sorgt für Wirbel", hoursAgo(8), "s4"),
+            ),
+        )
+        assertTrue(groups.isEmpty())
+    }
+
+    @Test
+    fun `per source cap keeps ticker floods from inflating document frequency`() {
+        // "kirchentag" kommt roh in 5 Titeln vor; gedeckelt (max. 2 je Quelle)
+        // sind es 3 – der fremde Artikel gruppiert daher mit den Tickern.
+        val groups = clusterer.cluster(
+            listOf(
+                ClusterCandidate(1, "Kirchentag startet mit Eröffnungsgottesdienst", hoursAgo(1), "a"),
+                ClusterCandidate(2, "Kirchentag: Zehntausende Besucher erwartet", hoursAgo(2), "a"),
+                ClusterCandidate(3, "Kirchentag diskutiert über Friedensethik", hoursAgo(3), "a"),
+                ClusterCandidate(4, "Kirchentag endet mit großem Abschlussgottesdienst", hoursAgo(4), "a"),
+                ClusterCandidate(5, "Evangelischer Kirchentag zieht positive Bilanz", hoursAgo(5), "b"),
+            ),
+        )
+        assertEquals(1, groups.size)
+        assertEquals(5, groups.single().size)
+    }
+
+    @Test
+    fun `relaxed rules respect their rarity gates`() {
+        val strictOnly = TopicClusterer(crossFeedSalientMaxDf = 1, crossFeedRareMaxDf = 0)
+        val groups = strictOnly.cluster(
+            listOf(
+                ClusterCandidate(1, "Bundesregierung einigt sich nach langem Streit auf Klimapaket", hoursAgo(1), "tagesschau"),
+                ClusterCandidate(2, "Klimapaket kommt: Koalition beendet Streit über Finanzierung der Maßnahmen", hoursAgo(3), "spiegel"),
+            ),
+        )
+        assertTrue(groups.isEmpty())
+    }
+
+    @Test
     fun `tokenizer removes stopwords and short tokens`() {
         val tokens = TopicClusterer.tokenize("Die Bundesregierung hat ein neues Klimapaket beschlossen – 20 Jahre danach")
         assertTrue("bundesregierung" in tokens)
