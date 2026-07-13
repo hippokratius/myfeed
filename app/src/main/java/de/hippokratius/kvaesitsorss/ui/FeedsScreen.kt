@@ -3,6 +3,7 @@ package de.hippokratius.kvaesitsorss.ui
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -51,18 +52,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import de.hippokratius.kvaesitsorss.AppGraph
 import de.hippokratius.kvaesitsorss.R
 import de.hippokratius.kvaesitsorss.core.opml.OpmlParser
 import de.hippokratius.kvaesitsorss.data.FeedEntity
 import de.hippokratius.kvaesitsorss.fetch.FeedFetchWorker
+import java.text.Collator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Filter-Sentinel für "Ohne Kategorie" (echte Kategorien sind nie leer). */
 private const val FILTER_UNCATEGORIZED = ""
+
+/** Ein Abschnitt der Feed-Liste; category = null steht für "Ohne Kategorie". */
+private data class FeedSection(val category: String?, val feeds: List<FeedEntity>)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,6 +86,7 @@ fun FeedsScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var editCategoryFeed by remember { mutableStateOf<FeedEntity?>(null) }
+    var deleteFeed by remember { mutableStateOf<FeedEntity?>(null) }
 
     // null = alle, "" = ohne Kategorie, sonst Kategoriename.
     var selectedFilter by rememberSaveable { mutableStateOf<String?>(null) }
@@ -93,10 +100,28 @@ fun FeedsScreen(
         }
         if (gone) selectedFilter = null
     }
-    val visibleFeeds = when (selectedFilter) {
-        null -> feeds
-        FILTER_UNCATEGORIZED -> feeds.filter { it.category.isNullOrBlank() }
-        else -> feeds.filter { it.category == selectedFilter }
+    // Locale-abhängige Sortierung (COLLATE NOCASE in SQL kennt keine Umlaute).
+    val collator = remember { Collator.getInstance() }
+    val byTitle = remember(collator) {
+        compareBy(collator) { feed: FeedEntity -> feed.title.ifBlank { feed.url } }
+    }
+    val sections = remember(feeds, byTitle) {
+        val grouped = feeds.groupBy { it.category?.takeIf { c -> c.isNotBlank() } }
+        buildList {
+            grouped.keys.filterNotNull()
+                .sortedWith(compareBy(collator) { it })
+                .forEach { category ->
+                    add(FeedSection(category, grouped.getValue(category).sortedWith(byTitle)))
+                }
+            grouped[null]?.let { add(FeedSection(null, it.sortedWith(byTitle))) }
+        }
+    }
+    val visibleFeeds = remember(feeds, selectedFilter, byTitle) {
+        when (selectedFilter) {
+            null -> feeds
+            FILTER_UNCATEGORIZED -> feeds.filter { it.category.isNullOrBlank() }
+            else -> feeds.filter { it.category == selectedFilter }
+        }.sortedWith(byTitle)
     }
 
     val opmlLauncher = rememberLauncherForActivityResult(
@@ -201,24 +226,36 @@ fun FeedsScreen(
                         onSelect = { selectedFilter = it },
                     )
                 }
+                val feedRow: @Composable (FeedEntity) -> Unit = { feed ->
+                    FeedRow(
+                        feed = feed,
+                        onToggle = { enabled ->
+                            scope.launch {
+                                graph.feedDao.update(feed.copy(enabled = enabled))
+                                graph.feedSyncer.regroupAndRefreshWidget()
+                            }
+                        },
+                        onDelete = { deleteFeed = feed },
+                        onEditCategory = { editCategoryFeed = feed },
+                    )
+                }
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(visibleFeeds, key = { it.id }) { feed ->
-                        FeedRow(
-                            feed = feed,
-                            onToggle = { enabled ->
-                                scope.launch {
-                                    graph.feedDao.update(feed.copy(enabled = enabled))
-                                    graph.feedSyncer.regroupAndRefreshWidget()
-                                }
-                            },
-                            onDelete = {
-                                scope.launch {
-                                    graph.feedDao.delete(feed)
-                                    graph.feedSyncer.regroupAndRefreshWidget()
-                                }
-                            },
-                            onEditCategory = { editCategoryFeed = feed },
-                        )
+                    if (selectedFilter == null) {
+                        for (section in sections) {
+                            item(key = "header-${section.category.orEmpty()}", contentType = "header") {
+                                FeedSectionHeader(
+                                    title = section.category ?: stringResource(R.string.category_none),
+                                    count = section.feeds.size,
+                                )
+                            }
+                            items(section.feeds, key = { it.id }, contentType = { "feed" }) { feed ->
+                                feedRow(feed)
+                            }
+                        }
+                    } else {
+                        items(visibleFeeds, key = { it.id }, contentType = { "feed" }) { feed ->
+                            feedRow(feed)
+                        }
                     }
                 }
             }
@@ -247,6 +284,45 @@ fun FeedsScreen(
             },
         )
     }
+
+    deleteFeed?.let { feed ->
+        AlertDialog(
+            onDismissRequest = { deleteFeed = null },
+            title = { Text(stringResource(R.string.feed_delete_confirm_title)) },
+            text = {
+                Text(stringResource(R.string.feed_delete_confirm_message, feed.title.ifBlank { feed.url }))
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        deleteFeed = null
+                        scope.launch {
+                            graph.feedDao.delete(feed)
+                            graph.feedSyncer.regroupAndRefreshWidget()
+                        }
+                    },
+                ) {
+                    Text(stringResource(R.string.action_delete))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteFeed = null }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+}
+
+/** Abschnitts-Überschrift mit Kategoriename und Feed-Anzahl. */
+@Composable
+private fun FeedSectionHeader(title: String, count: Int) {
+    Text(
+        text = stringResource(R.string.category_header_count, title, count),
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp),
+    )
 }
 
 /** Horizontale Chip-Zeile: "Alle" + Kategorien + ggf. "Ohne Kategorie". */
@@ -286,6 +362,7 @@ private fun CategoryFilterRow(
     }
 }
 
+/** Kompakte Feed-Zeile; Tippen auf die Zeile öffnet den Kategorie-Dialog. */
 @Composable
 private fun FeedRow(
     feed: FeedEntity,
@@ -294,7 +371,10 @@ private fun FeedRow(
     onEditCategory: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onEditCategory)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -302,18 +382,14 @@ private fun FeedRow(
                 text = feed.title.ifBlank { feed.url },
                 style = MaterialTheme.typography.bodyLarge,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = feed.url,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
-            )
-            AssistChip(
-                onClick = onEditCategory,
-                label = {
-                    Text(feed.category?.takeIf { it.isNotBlank() } ?: stringResource(R.string.category_none))
-                },
+                overflow = TextOverflow.Ellipsis,
             )
         }
         Switch(checked = feed.enabled, onCheckedChange = onToggle)
