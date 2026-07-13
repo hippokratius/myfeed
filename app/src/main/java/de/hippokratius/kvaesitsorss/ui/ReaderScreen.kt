@@ -107,8 +107,8 @@ fun ReaderScreen(
         }
     }
     val articles by articlesFlow.collectAsState(initial = emptyList())
-    val entries = remember(articles) {
-        WidgetEntries.fromArticles(articles, maxRelated = READER_MAX_RELATED)
+    val entries = remember(articles, settings.filterWords) {
+        WidgetEntries.fromArticles(articles, maxRelated = READER_MAX_RELATED, filterWords = settings.filterWords)
     }
     val feedIcons = remember(feeds) {
         feeds.mapNotNull { feed -> feed.iconPath?.let { feed.id to it } }.toMap()
