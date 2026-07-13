@@ -18,8 +18,14 @@
     <string name="action_back">Back</string>
 
     <string name="feeds_empty_hint">No feeds yet. Add a feed URL with the + button or import an OPML file from the menu.</string>
-    <string name="feed_url_label">Feed URL</string>
+    <string name="feed_url_or_site_label">Feed or website URL</string>
+    <string name="feed_url_placeholder">e.g. zdf.de or https://…/feed</string>
     <string name="feed_url_invalid">The feed could not be loaded. Please check the URL.</string>
+    <string name="feed_add_network_error">The page could not be loaded. Please check your connection and the URL.</string>
+    <string name="feed_discovery_found">Feeds found</string>
+    <string name="feed_catalog_matches">From the catalog</string>
+    <string name="feed_discovery_empty">No feeds were found on this page.</string>
+    <string name="action_close">Close</string>
     <string name="opml_imported">Imported %1$d feeds</string>
 
     <string name="settings_refresh_interval">Refresh interval</string>
@@ -37,7 +43,9 @@
     <string name="discover_language_en">English</string>
 
     <string name="category_news">News</string>
+    <string name="category_politics">Politics</string>
     <string name="category_regional">Regional</string>
+    <string name="category_gaming">Gaming</string>
     <string name="category_tech">Tech</string>
     <string name="category_sport">Sports</string>
     <string name="category_science">Science</string>
