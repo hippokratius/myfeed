@@ -20,7 +20,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
@@ -275,6 +274,15 @@ fun FeedsScreen(
             graph = graph,
             categories = categories,
             addedUrls = addedUrls,
+            // Im Screen-Scope einfügen: Der Dialog-Scope stirbt beim Schließen sofort.
+            onAdd = { feedUrl, title, feedCategory ->
+                scope.launch {
+                    graph.feedDao.insert(
+                        FeedEntity(url = feedUrl, title = title.orEmpty(), category = feedCategory),
+                    )
+                    FeedFetchWorker.syncNow(context)
+                }
+            },
             onDismiss = { showAddDialog = false },
         )
     }
@@ -498,6 +506,7 @@ private fun AddFeedDialog(
     graph: AppGraph,
     categories: List<String>,
     addedUrls: Set<String>,
+    onAdd: (url: String, title: String?, category: String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -511,20 +520,11 @@ private fun AddFeedDialog(
     val suggestions = step as? AddFeedStep.Suggestions
 
     fun addFeed(feedUrl: String, title: String?) {
-        scope.launch {
-            graph.feedDao.insert(
-                FeedEntity(
-                    url = feedUrl,
-                    title = title.orEmpty(),
-                    category = category.trim().ifBlank { null },
-                ),
-            )
-            FeedFetchWorker.syncNow(context)
-        }
+        onAdd(feedUrl, title, category.trim().ifBlank { null })
     }
 
     AlertDialog(
-        onDismissRequest = { if (!loading) onDismiss() },
+        onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.action_add_feed)) },
         text = {
             Column {
@@ -593,10 +593,12 @@ private fun AddFeedDialog(
                             .verticalScroll(rememberScrollState()),
                     ) {
                         for (candidate in suggestions.feeds) {
-                            DiscoveredFeedRow(
-                                candidate = candidate,
+                            FeedSuggestionRow(
+                                title = candidate.title ?: candidate.url,
+                                subtitle = candidate.url,
                                 added = FeedUrls.canonical(candidate.url) in addedUrls,
                                 onAdd = { addFeed(candidate.url, candidate.title) },
+                                modifier = Modifier.padding(vertical = 4.dp),
                             )
                         }
                     }
@@ -612,23 +614,14 @@ private fun AddFeedDialog(
                 TextButton(
                     enabled = !loading && url.isNotBlank(),
                     onClick = {
-                        val normalized = url.trim().let {
-                            if (it.startsWith("http://") || it.startsWith("https://")) it else "https://$it"
-                        }
+                        error = null
                         step = AddFeedStep.Loading
                         scope.launch {
-                            runCatching { graph.feedSyncer.resolveFeedInput(normalized) }.fold(
+                            runCatching { graph.feedSyncer.resolveFeedInput(url) }.fold(
                                 onSuccess = { resolution ->
                                     when (resolution) {
                                         is FeedResolution.Direct -> {
-                                            graph.feedDao.insert(
-                                                FeedEntity(
-                                                    url = normalized,
-                                                    title = resolution.feed.title.orEmpty(),
-                                                    category = category.trim().ifBlank { null },
-                                                ),
-                                            )
-                                            FeedFetchWorker.syncNow(context)
+                                            addFeed(resolution.url, resolution.feed.title)
                                             onDismiss()
                                         }
                                         is FeedResolution.Discovered -> {
@@ -664,49 +657,10 @@ private fun AddFeedDialog(
                     Text(stringResource(R.string.action_back))
                 }
             } else {
-                TextButton(enabled = !loading, onClick = onDismiss) {
+                TextButton(onClick = onDismiss) {
                     Text(stringResource(R.string.action_cancel))
                 }
             }
         },
     )
-}
-
-@Composable
-private fun DiscoveredFeedRow(
-    candidate: DiscoveredFeed,
-    added: Boolean,
-    onAdd: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = candidate.title ?: candidate.url,
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = candidate.url,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        if (added) {
-            Icon(
-                Icons.Default.Check,
-                contentDescription = stringResource(R.string.discover_added),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-        } else {
-            IconButton(onClick = onAdd) {
-                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_add))
-            }
-        }
-    }
 }

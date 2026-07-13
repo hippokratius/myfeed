@@ -154,6 +154,33 @@ class FeedLinkFinderTest {
     }
 
     @Test
+    fun `handles greater-than sign inside quoted attribute values`() {
+        val html = """<link rel="alternate" type="application/rss+xml" title="Home > News" href="/feed.xml">"""
+
+        val feeds = FeedLinkFinder.find(html, "https://example.org/")
+
+        assertEquals(listOf(DiscoveredFeed("https://example.org/feed.xml", "Home > News")), feeds)
+    }
+
+    @Test
+    fun `detects charset from meta tags`() {
+        assertEquals("utf-8", FeedLinkFinder.detectCharset("""<html><head><meta charset="utf-8"></head>"""))
+        assertEquals(
+            "iso-8859-1",
+            FeedLinkFinder.detectCharset(
+                """<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">""",
+            ),
+        )
+        // Ein charset in einem <link type="…; charset=…"> ist keine Seiten-Deklaration.
+        assertNull(
+            FeedLinkFinder.detectCharset(
+                """<link rel="alternate" type="application/rss+xml; charset=UTF-8" href="/f">""",
+            ),
+        )
+        assertNull(FeedLinkFinder.detectCharset("<html><head></head>"))
+    }
+
+    @Test
     fun `common feed paths derive from site root of a deep url`() {
         val paths = FeedLinkFinder.commonFeedPaths("https://www.zdf.de/nachrichten/politik?x=1")
 

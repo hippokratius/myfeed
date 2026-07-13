@@ -16,8 +16,11 @@ data class DiscoveredFeed(
  */
 object FeedLinkFinder {
 
-    private val LINK_TAG_REGEX = Regex("<link\\b[^>]*>", RegexOption.IGNORE_CASE)
-    private val BASE_TAG_REGEX = Regex("<base\\b[^>]*>", RegexOption.IGNORE_CASE)
+    // Tags enden am ersten ">" außerhalb von Anführungszeichen (title="Home > News").
+    private val LINK_TAG_REGEX = Regex("<link\\b(?:[^>\"']|\"[^\"]*\"|'[^']*')*>", RegexOption.IGNORE_CASE)
+    private val BASE_TAG_REGEX = Regex("<base\\b(?:[^>\"']|\"[^\"]*\"|'[^']*')*>", RegexOption.IGNORE_CASE)
+    private val META_TAG_REGEX = Regex("<meta\\b(?:[^>\"']|\"[^\"]*\"|'[^']*')*>", RegexOption.IGNORE_CASE)
+    private val CHARSET_REGEX = Regex("charset\\s*=\\s*[\"']?([A-Za-z0-9_-]+)", RegexOption.IGNORE_CASE)
 
     /** Attribut-Paare in beliebiger Reihenfolge, mit ", ' oder ohne Anführungszeichen. */
     private val ATTRIBUTE_REGEX = Regex("([a-zA-Z-]+)\\s*=\\s*(\"[^\"]*\"|'[^']*'|[^\\s\"'>]+)")
@@ -58,6 +61,18 @@ object FeedLinkFinder {
             result += DiscoveredFeed(url = url, title = HtmlText.clean(attributes["title"]).ifBlank { null })
         }
         return result
+    }
+
+    /**
+     * Liest den in <meta charset=…> bzw. <meta http-equiv content="…charset=…"> deklarierten
+     * Zeichensatz aus dem Seitenanfang (für Server, die keinen im Content-Type mitschicken).
+     */
+    fun detectCharset(htmlPrefix: String): String? {
+        for (tag in META_TAG_REGEX.findAll(htmlPrefix)) {
+            val charset = CHARSET_REGEX.find(tag.value) ?: continue
+            return charset.groupValues[1]
+        }
+        return null
     }
 
     /** Typische Feed-Pfade an der Site-Root von [pageUrl] (Fallback ohne <link>-Tags). */
