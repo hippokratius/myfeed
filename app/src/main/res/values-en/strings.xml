@@ -45,6 +45,10 @@
     <string name="category_culture">Culture</string>
     <string name="category_all">All</string>
     <string name="category_none">Uncategorized</string>
+    <string name="category_header_count">%1$s (%2$d)</string>
+
+    <string name="feed_delete_confirm_title">Delete feed?</string>
+    <string name="feed_delete_confirm_message">This removes “%1$s” and all of its articles.</string>
 
     <string name="feed_category_label">Category</string>
     <string name="feed_category_new">New category</string>
