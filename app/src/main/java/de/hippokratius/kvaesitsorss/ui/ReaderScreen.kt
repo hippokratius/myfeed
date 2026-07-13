@@ -54,7 +54,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import de.hippokratius.kvaesitsorss.AppGraph
@@ -379,31 +381,47 @@ private fun RelatedCard(
         color = MaterialTheme.colorScheme.surfaceVariant,
         modifier = Modifier.width(280.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                SourceLine(article, iconPath)
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = article.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    minLines = 3,
-                    maxLines = 3,
-                )
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    // Quellenname bekommt die volle Kartenbreite, damit z. B.
+                    // "DER STANDARD" nicht abgeschnitten wird.
+                    SourceBadge(article, iconPath)
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = article.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        minLines = 3,
+                        maxLines = 3,
+                    )
+                }
+                if (showImages && article.thumbPath != null) {
+                    Spacer(modifier = Modifier.width(10.dp))
+                    AsyncImage(
+                        model = File(article.thumbPath),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                    )
+                }
             }
-            if (showImages && article.thumbPath != null) {
-                Spacer(modifier = Modifier.width(10.dp))
-                AsyncImage(
-                    model = File(article.thumbPath),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(RoundedCornerShape(8.dp)),
+            Spacer(modifier = Modifier.height(4.dp))
+            val color = MaterialTheme.colorScheme.onSurfaceVariant
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = relativeTime(article),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = color,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f),
                 )
+                ShareIcon(article, tint = color)
             }
         }
     }
@@ -412,17 +430,32 @@ private fun RelatedCard(
 /** Quellenzeile: kleines Feed-Logo (falls vorhanden), Name links, Zeit und Teilen rechts. */
 @Composable
 private fun SourceLine(article: ArticleEntity, iconPath: String?) {
-    val context = LocalContext.current
     val color = MaterialTheme.colorScheme.onSurfaceVariant
-    val relativeTime = DateUtils.getRelativeTimeSpanString(
-        article.publishedAt,
-        System.currentTimeMillis(),
-        DateUtils.MINUTE_IN_MILLIS,
-    ).toString()
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        SourceBadge(article, iconPath, modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = relativeTime(article),
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            maxLines = 1,
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        ShareIcon(article, tint = color)
+    }
+}
+
+/** Feed-Logo (falls vorhanden) plus Quellenname mit Ellipse bei Platzmangel. */
+@Composable
+private fun SourceBadge(
+    article: ArticleEntity,
+    iconPath: String?,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         if (iconPath != null) {
             AsyncImage(
                 model = File(iconPath),
@@ -435,30 +468,35 @@ private fun SourceLine(article: ArticleEntity, iconPath: String?) {
         Text(
             text = article.sourceTitle,
             style = MaterialTheme.typography.labelSmall,
-            color = color,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
-            modifier = Modifier.weight(1f),
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = relativeTime,
-            style = MaterialTheme.typography.labelSmall,
-            color = color,
-            maxLines = 1,
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-        Icon(
-            imageVector = Icons.Default.Share,
-            contentDescription = stringResource(R.string.action_share),
-            tint = color,
-            modifier = Modifier
-                .clip(CircleShape)
-                .clickable { shareArticle(context, article) }
-                .padding(4.dp)
-                .size(16.dp),
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
+
+/** Runder Teilen-Button, kompakt genug für die Quellenzeile. */
+@Composable
+private fun ShareIcon(article: ArticleEntity, tint: Color) {
+    val context = LocalContext.current
+    Icon(
+        imageVector = Icons.Default.Share,
+        contentDescription = stringResource(R.string.action_share),
+        tint = tint,
+        modifier = Modifier
+            .clip(CircleShape)
+            .clickable { shareArticle(context, article) }
+            .padding(6.dp)
+            .size(20.dp),
+    )
+}
+
+private fun relativeTime(article: ArticleEntity): String =
+    DateUtils.getRelativeTimeSpanString(
+        article.publishedAt,
+        System.currentTimeMillis(),
+        DateUtils.MINUTE_IN_MILLIS,
+    ).toString()
 
 private fun openLink(context: android.content.Context, link: String) {
     runCatching {
