@@ -25,11 +25,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
@@ -128,8 +126,6 @@ fun ReaderScreen(
         if (stale) FeedFetchWorker.syncNow(context)
     }
 
-    var menuOpen by remember { mutableStateOf(false) }
-
     // Scroll-Zustand der Artikelliste; sichtbar gemacht für den "Zum Anfang"-FAB.
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -166,23 +162,10 @@ fun ReaderScreen(
                             contentDescription = stringResource(R.string.action_manage_feeds),
                         )
                     }
-                    IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = null)
-                    }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.action_discover)) },
-                            onClick = {
-                                menuOpen = false
-                                onOpenDiscover()
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.action_settings)) },
-                            onClick = {
-                                menuOpen = false
-                                onOpenSettings()
-                            },
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.action_settings),
                         )
                     }
                 },
