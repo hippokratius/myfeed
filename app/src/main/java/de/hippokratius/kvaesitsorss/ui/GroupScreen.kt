@@ -27,6 +27,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,7 +38,9 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import de.hippokratius.kvaesitsorss.AppGraph
 import de.hippokratius.kvaesitsorss.R
+import de.hippokratius.kvaesitsorss.core.filter.WordFilter
 import de.hippokratius.kvaesitsorss.data.ArticleEntity
+import de.hippokratius.kvaesitsorss.settings.AppSettings
 import java.io.File
 import java.net.URLDecoder
 
@@ -49,7 +52,12 @@ fun GroupScreen(
     onBack: () -> Unit,
 ) {
     val decodedGroupId = runCatching { URLDecoder.decode(groupId, "UTF-8") }.getOrDefault(groupId)
-    val articles by graph.articleDao.observeGroup(decodedGroupId).collectAsState(initial = emptyList())
+    val allArticles by graph.articleDao.observeGroup(decodedGroupId).collectAsState(initial = emptyList())
+    val settings by graph.settingsRepository.settings.collectAsState(initial = AppSettings())
+    val articles = remember(allArticles, settings.filterWords) {
+        val filter = WordFilter(settings.filterWords)
+        if (filter.isEmpty) allArticles else allArticles.filterNot { filter.matches(it.title) }
+    }
 
     Scaffold(
         topBar = {

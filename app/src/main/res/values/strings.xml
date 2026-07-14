@@ -35,6 +35,10 @@
     <string name="settings_days">%1$d Tage</string>
     <string name="settings_show_images">Bilder anzeigen</string>
     <string name="settings_grouping">Ähnliche Artikel gruppieren</string>
+    <string name="settings_word_filter">Wortfilter</string>
+    <string name="settings_word_filter_hint">Artikel ausblenden, deren Titel eines dieser Wörter enthält.</string>
+    <string name="settings_word_filter_add_label">Wort hinzufügen</string>
+    <string name="settings_word_filter_remove">Filterwort entfernen: %1$s</string>
 
     <string name="group_title">Artikel zum Thema</string>
 

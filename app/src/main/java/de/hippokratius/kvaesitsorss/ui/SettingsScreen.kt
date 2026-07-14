@@ -7,14 +7,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -23,15 +28,20 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import de.hippokratius.kvaesitsorss.AppGraph
 import de.hippokratius.kvaesitsorss.R
 import de.hippokratius.kvaesitsorss.settings.AppSettings
+import de.hippokratius.kvaesitsorss.widget.RssWidget
 import kotlinx.coroutines.launch
 
 private val REFRESH_INTERVALS = listOf(15, 30, 60, 180)
@@ -112,6 +122,60 @@ fun SettingsScreen(
                     }
                 },
             )
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+            SectionTitle(stringResource(R.string.settings_word_filter))
+            Text(
+                text = stringResource(R.string.settings_word_filter_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+
+            var newWord by remember { mutableStateOf("") }
+            val addWord: () -> Unit = {
+                val word = newWord.trim()
+                if (word.isNotEmpty()) {
+                    newWord = ""
+                    scope.launch {
+                        graph.settingsRepository.addFilterWord(word)
+                        RssWidget.updateAll(context)
+                    }
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedTextField(
+                    value = newWord,
+                    onValueChange = { newWord = it },
+                    label = { Text(stringResource(R.string.settings_word_filter_add_label)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { addWord() }),
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = addWord, enabled = newWord.isNotBlank()) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = stringResource(R.string.settings_word_filter_add_label),
+                    )
+                }
+            }
+
+            settings.filterWords.sortedWith(String.CASE_INSENSITIVE_ORDER).forEach { word ->
+                FilterWordRow(
+                    word = word,
+                    onDelete = {
+                        scope.launch {
+                            graph.settingsRepository.removeFilterWord(word)
+                            RssWidget.updateAll(context)
+                        }
+                    },
+                )
+            }
         }
     }
 }
@@ -134,6 +198,26 @@ private fun RadioRow(label: String, selected: Boolean, onClick: () -> Unit) {
     ) {
         RadioButton(selected = selected, onClick = onClick)
         Text(label, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+@Composable
+private fun FilterWordRow(word: String, onDelete: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = word,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(onClick = onDelete) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = stringResource(R.string.settings_word_filter_remove, word),
+            )
+        }
     }
 }
 

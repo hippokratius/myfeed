@@ -1,5 +1,6 @@
 package de.hippokratius.kvaesitsorss.widget
 
+import de.hippokratius.kvaesitsorss.core.filter.WordFilter
 import de.hippokratius.kvaesitsorss.data.ArticleDao
 import de.hippokratius.kvaesitsorss.data.ArticleEntity
 import de.hippokratius.kvaesitsorss.data.FeedDao
@@ -41,24 +42,33 @@ object WidgetEntries {
     const val MAX_RELATED_SHOWN = 3
     const val SOURCE_LIMIT = 150
 
-    suspend fun buildData(articleDao: ArticleDao, feedDao: FeedDao, category: String? = null): WidgetData {
+    suspend fun buildData(
+        articleDao: ArticleDao,
+        feedDao: FeedDao,
+        category: String? = null,
+        filterWords: Collection<String> = emptySet(),
+    ): WidgetData {
         val icons = feedDao.getAll()
             .mapNotNull { feed -> feed.iconPath?.let { feed.id to it } }
             .toMap()
-        return WidgetData(build(articleDao, category), icons)
+        return WidgetData(build(articleDao, category, filterWords), icons)
     }
 
     /**
      * Lädt die neuesten Artikel und formt sie in die Widget-Liste um.
      * Mit [category] werden nur Artikel von Feeds dieser Kategorie geladen.
      */
-    suspend fun build(articleDao: ArticleDao, category: String? = null): List<WidgetEntry> {
+    suspend fun build(
+        articleDao: ArticleDao,
+        category: String? = null,
+        filterWords: Collection<String> = emptySet(),
+    ): List<WidgetEntry> {
         val articles = if (category == null) {
             articleDao.newest(limit = SOURCE_LIMIT)
         } else {
             articleDao.newestInCategory(category, limit = SOURCE_LIMIT)
         }
-        return fromArticles(articles)
+        return fromArticles(articles, filterWords = filterWords)
     }
 
     /**
@@ -66,12 +76,16 @@ object WidgetEntries {
      * werden zu einer Gruppen-Karte zusammengefasst (Hauptartikel = neuester,
      * mit Bild bevorzugt), alle anderen bleiben Einzelzeilen. [maxRelated]
      * begrenzt die direkt sichtbaren verwandten Artikel je Gruppe.
+     * Artikel, deren Titel ein Wort aus [filterWords] enthält, werden ausgeblendet.
      */
     fun fromArticles(
         articles: List<ArticleEntity>,
         maxRelated: Int = MAX_RELATED_SHOWN,
+        filterWords: Collection<String> = emptySet(),
     ): List<WidgetEntry> {
-        val byGroup = articles.filter { it.groupId != null }.groupBy { it.groupId!! }
+        val filter = WordFilter(filterWords)
+        val visible = if (filter.isEmpty) articles else articles.filterNot { filter.matches(it.title) }
+        val byGroup = visible.filter { it.groupId != null }.groupBy { it.groupId!! }
         val entries = mutableListOf<WidgetEntry>()
 
         for ((groupId, members) in byGroup) {
@@ -90,7 +104,7 @@ object WidgetEntries {
             )
         }
 
-        articles.filter { it.groupId == null }.forEach { entries += WidgetEntry.Single(it) }
+        visible.filter { it.groupId == null }.forEach { entries += WidgetEntry.Single(it) }
 
         return entries.sortedByDescending { it.sortKey }.take(MAX_ENTRIES)
     }
