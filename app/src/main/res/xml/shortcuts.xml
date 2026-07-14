@@ -12,12 +12,14 @@
         android:icon="@drawable/ic_shortcut_feeds"
         android:shortcutShortLabel="@string/shortcut_feeds_short"
         android:shortcutLongLabel="@string/action_manage_feeds">
+        <!-- targetPackage muss der applicationId entsprechen – die bleibt aus
+             Update-Kompatibilität bei der alten ID (siehe app/build.gradle.kts). -->
         <intent
             android:action="android.intent.action.VIEW"
             android:targetPackage="de.hippokratius.kvaesitsorss"
-            android:targetClass="de.hippokratius.kvaesitsorss.ui.MainActivity">
+            android:targetClass="de.hippokratius.myfeed.ui.MainActivity">
             <extra
-                android:name="de.hippokratius.kvaesitsorss.extra.SCREEN"
+                android:name="de.hippokratius.myfeed.extra.SCREEN"
                 android:value="feeds" />
         </intent>
     </shortcut>

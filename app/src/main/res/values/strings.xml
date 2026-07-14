@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Kvaesitso RSS</string>
+    <string name="app_name">MyFeed</string>
     <string name="widget_label">RSS-Feed</string>
     <string name="widget_description">Scrollbarer RSS-Reader mit Themen-Gruppierung für den Startbildschirm</string>
     <string name="widget_no_feeds">Noch keine Feeds – tippe hier, um Feeds hinzuzufügen</string>

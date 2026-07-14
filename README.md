@@ -1,4 +1,4 @@
-# Kvaesitso RSS
+# MyFeed
 
 Ein scrollbarer RSS-Reader als Android-App-Widget – gebaut für den
 [Kvaesitso-Launcher](https://kvaesitso.mm20.de/). Das Widget zeigt nur
@@ -53,7 +53,7 @@ Da die App direkt im Vollbild-Feed startet, genügt:
 
 1. Kvaesitso-Einstellungen → **Gesten** → gewünschte Geste (z. B.
    *Nach links wischen*)
-2. **App starten** → **Kvaesitso RSS** auswählen
+2. **App starten** → **MyFeed** auswählen
 
 Ein Wisch öffnet dann den Feed im Vollbild. Kvaesitso kann Gesten auch mit
 **App-Shortcuts** belegen – die App bringt dafür den Shortcut
@@ -66,7 +66,7 @@ führen soll.
    oder OPML-Import)
 2. In Kvaesitso auf dem Startbildschirm nach unten scrollen → **Bearbeiten**
    (Stift-Symbol) → **Widget hinzufügen**
-3. Unter **Kvaesitso RSS** das Widget **RSS-Feed** auswählen
+3. Unter **MyFeed** das Widget **RSS-Feed** auswählen
 4. Beim Platzieren fragt das Widget, ob es alle Feeds oder nur eine
    Kategorie anzeigen soll
 5. Über den Widget-Rahmen die Höhe nach Wunsch anpassen – die Liste
@@ -86,13 +86,18 @@ Ohne Android SDK wird nur das `:core`-Modul konfiguriert – die JVM-Tests
 laufen dann trotzdem: `./gradlew :core:test`.
 
 Bei jedem Push baut GitHub Actions die Debug-APK und hängt sie als
-Artifact **kvaesitso-rss-debug-apk** an den Workflow-Lauf an
+Artifact **myfeed-debug-apk** an den Workflow-Lauf an
 (Actions-Tab → letzter Lauf → Artifacts).
 
 Alle Debug-Builds werden mit dem eingecheckten Keystore
 `signing/debug.keystore` signiert (Standard-Debug-Passwörter, kein
 Geheimnis) — dadurch lassen sich neue APKs ohne Deinstallation über die
 bestehende Installation aktualisieren.
+
+Hinweis: Trotz des App-Namens **MyFeed** behält die App die applicationId
+`de.hippokratius.kvaesitsorss` (und den Datenbank-Dateinamen) bei – eine
+geänderte ID wäre für Android eine neue App, Updates über bestehende
+Installationen würden abgelehnt und Feeds/Einstellungen gingen verloren.
 
 ## Architektur
 

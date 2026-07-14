@@ -8,10 +8,13 @@ plugins {
 }
 
 android {
-    namespace = "de.hippokratius.kvaesitsorss"
+    namespace = "de.hippokratius.myfeed"
     compileSdk = 35
 
     defaultConfig {
+        // Bleibt trotz Umbenennung in "MyFeed" bei der alten ID: Eine geänderte
+        // applicationId wäre für Android eine neue App – Updates über bestehende
+        // Installationen würden abgelehnt, Feeds und Einstellungen gingen verloren.
         applicationId = "de.hippokratius.kvaesitsorss"
         minSdk = 26
         targetSdk = 35
