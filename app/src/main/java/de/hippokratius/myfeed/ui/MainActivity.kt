@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import de.hippokratius.myfeed.MyFeedApp
 import java.net.URLEncoder
 
@@ -48,23 +49,27 @@ class MainActivity : ComponentActivity() {
                         ReaderScreen(
                             graph = graph,
                             onOpenFeeds = { navController.navigate("feeds") },
-                            onOpenDiscover = { navController.navigate("discover") },
+                            onOpenDiscover = { navController.navigate("feeds?tab=discover") },
                             onOpenSettings = { navController.navigate("settings") },
                             onOpenGroup = { groupId ->
                                 navController.navigate("group/${URLEncoder.encode(groupId, "UTF-8")}")
                             },
                         )
                     }
-                    composable("feeds") {
+                    composable(
+                        route = "feeds?tab={tab}",
+                        arguments = listOf(navArgument("tab") { defaultValue = "manage" }),
+                    ) { backStackEntry ->
                         FeedsScreen(
                             graph = graph,
                             onBack = { navController.popBackStack() },
                             onOpenSettings = { navController.navigate("settings") },
-                            onOpenDiscover = { navController.navigate("discover") },
+                            initialTab = if (backStackEntry.arguments?.getString("tab") == "discover") {
+                                FeedsTab.DISCOVER
+                            } else {
+                                FeedsTab.MANAGE
+                            },
                         )
-                    }
-                    composable("discover") {
-                        DiscoverScreen(graph = graph, onBack = { navController.popBackStack() })
                     }
                     composable("settings") {
                         SettingsScreen(graph = graph, onBack = { navController.popBackStack() })
