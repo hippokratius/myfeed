@@ -116,7 +116,7 @@ private fun DiscoverCategoryRow(
     LazyRow(
         contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         item {
             FilterChip(
