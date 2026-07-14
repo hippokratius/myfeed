@@ -35,9 +35,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -45,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -77,19 +80,30 @@ private const val FILTER_UNCATEGORIZED = ""
 /** Ein Abschnitt der Feed-Liste; category = null steht für "Ohne Kategorie". */
 private data class FeedSection(val category: String?, val feeds: List<FeedEntity>)
 
+/** Tab-Indizes des Quellen-Screens. */
+object FeedsTab {
+    const val MANAGE = 0
+    const val DISCOVER = 1
+}
+
+/**
+ * Quellen-Screen mit zwei Tabs: eigene Feeds verwalten ("Meine Feeds")
+ * und den kuratierten Katalog durchstöbern ("Entdecken").
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FeedsScreen(
     graph: AppGraph,
     onBack: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenDiscover: () -> Unit,
+    initialTab: Int = FeedsTab.MANAGE,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val feeds by graph.feedDao.observeAll().collectAsState(initial = emptyList())
     val categories by graph.feedDao.observeCategories().collectAsState(initial = emptyList())
 
+    var selectedTab by rememberSaveable { mutableIntStateOf(initialTab) }
     var showAddDialog by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var editCategoryFeed by remember { mutableStateOf<FeedEntity?>(null) }
@@ -162,7 +176,7 @@ fun FeedsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.action_manage_feeds)) },
+                title = { Text(stringResource(R.string.sources_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -179,13 +193,6 @@ fun FeedsScreen(
                         Icon(Icons.Default.MoreVert, contentDescription = null)
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.action_discover)) },
-                            onClick = {
-                                menuOpen = false
-                                onOpenDiscover()
-                            },
-                        )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.action_import_opml)) },
                             onClick = {
@@ -205,66 +212,46 @@ fun FeedsScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_add_feed))
+            if (selectedTab == FeedsTab.MANAGE) {
+                FloatingActionButton(onClick = { showAddDialog = true }) {
+                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_add_feed))
+                }
             }
         },
     ) { padding ->
-        if (feeds.isEmpty()) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    text = stringResource(R.string.feeds_empty_hint),
-                    style = MaterialTheme.typography.bodyLarge,
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            PrimaryTabRow(selectedTabIndex = selectedTab) {
+                Tab(
+                    selected = selectedTab == FeedsTab.MANAGE,
+                    onClick = { selectedTab = FeedsTab.MANAGE },
+                    text = { Text(stringResource(R.string.tab_my_feeds)) },
                 )
-                TextButton(onClick = onOpenDiscover, modifier = Modifier.padding(top = 12.dp)) {
-                    Text(stringResource(R.string.action_discover))
-                }
+                Tab(
+                    selected = selectedTab == FeedsTab.DISCOVER,
+                    onClick = { selectedTab = FeedsTab.DISCOVER },
+                    text = { Text(stringResource(R.string.tab_discover)) },
+                )
             }
-        } else {
-            Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-                if (categories.isNotEmpty()) {
-                    CategoryFilterRow(
-                        categories = categories,
-                        hasUncategorized = hasUncategorized,
-                        selected = selectedFilter,
-                        onSelect = { selectedFilter = it },
-                    )
-                }
-                val feedRow: @Composable (FeedEntity) -> Unit = { feed ->
-                    FeedRow(
-                        feed = feed,
-                        onToggle = { enabled ->
-                            scope.launch {
-                                graph.feedDao.update(feed.copy(enabled = enabled))
-                                graph.feedSyncer.regroupAndRefreshWidget()
-                            }
-                        },
-                        onDelete = { deleteFeed = feed },
-                        onEditCategory = { editCategoryFeed = feed },
-                    )
-                }
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    if (selectedFilter == null) {
-                        for (section in sections) {
-                            item(key = "header-${section.category.orEmpty()}", contentType = "header") {
-                                FeedSectionHeader(
-                                    title = section.category ?: stringResource(R.string.category_none),
-                                    count = section.feeds.size,
-                                )
-                            }
-                            items(section.feeds, key = { it.id }, contentType = { "feed" }) { feed ->
-                                feedRow(feed)
-                            }
+            when (selectedTab) {
+                FeedsTab.MANAGE -> ManageFeedsTab(
+                    feeds = feeds,
+                    categories = categories,
+                    sections = sections,
+                    visibleFeeds = visibleFeeds,
+                    hasUncategorized = hasUncategorized,
+                    selectedFilter = selectedFilter,
+                    onSelectFilter = { selectedFilter = it },
+                    onToggle = { feed, enabled ->
+                        scope.launch {
+                            graph.feedDao.update(feed.copy(enabled = enabled))
+                            graph.feedSyncer.regroupAndRefreshWidget()
                         }
-                    } else {
-                        items(visibleFeeds, key = { it.id }, contentType = { "feed" }) { feed ->
-                            feedRow(feed)
-                        }
-                    }
-                }
+                    },
+                    onDelete = { deleteFeed = it },
+                    onEditCategory = { editCategoryFeed = it },
+                    onOpenDiscover = { selectedTab = FeedsTab.DISCOVER },
+                )
+                else -> DiscoverTab(graph)
             }
         }
     }
@@ -329,6 +316,75 @@ fun FeedsScreen(
                 }
             },
         )
+    }
+}
+
+/** Tab "Meine Feeds": Empty-State bzw. Kategorie-Filter und Feed-Liste. */
+@Composable
+private fun ManageFeedsTab(
+    feeds: List<FeedEntity>,
+    categories: List<String>,
+    sections: List<FeedSection>,
+    visibleFeeds: List<FeedEntity>,
+    hasUncategorized: Boolean,
+    selectedFilter: String?,
+    onSelectFilter: (String?) -> Unit,
+    onToggle: (FeedEntity, Boolean) -> Unit,
+    onDelete: (FeedEntity) -> Unit,
+    onEditCategory: (FeedEntity) -> Unit,
+    onOpenDiscover: () -> Unit,
+) {
+    if (feeds.isEmpty()) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = stringResource(R.string.feeds_empty_hint),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            TextButton(onClick = onOpenDiscover, modifier = Modifier.padding(top = 12.dp)) {
+                Text(stringResource(R.string.action_discover))
+            }
+        }
+    } else {
+        Column(modifier = Modifier.fillMaxSize()) {
+            if (categories.isNotEmpty()) {
+                CategoryFilterRow(
+                    categories = categories,
+                    hasUncategorized = hasUncategorized,
+                    selected = selectedFilter,
+                    onSelect = onSelectFilter,
+                )
+            }
+            val feedRow: @Composable (FeedEntity) -> Unit = { feed ->
+                FeedRow(
+                    feed = feed,
+                    onToggle = { enabled -> onToggle(feed, enabled) },
+                    onDelete = { onDelete(feed) },
+                    onEditCategory = { onEditCategory(feed) },
+                )
+            }
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                if (selectedFilter == null) {
+                    for (section in sections) {
+                        item(key = "header-${section.category.orEmpty()}", contentType = "header") {
+                            FeedSectionHeader(
+                                title = section.category ?: stringResource(R.string.category_none),
+                                count = section.feeds.size,
+                            )
+                        }
+                        items(section.feeds, key = { it.id }, contentType = { "feed" }) { feed ->
+                            feedRow(feed)
+                        }
+                    }
+                } else {
+                    items(visibleFeeds, key = { it.id }, contentType = { "feed" }) { feed ->
+                        feedRow(feed)
+                    }
+                }
+            }
+        }
     }
 }
 

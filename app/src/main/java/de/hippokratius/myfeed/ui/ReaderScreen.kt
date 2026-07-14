@@ -19,10 +19,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
@@ -30,6 +32,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,9 +46,11 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -68,6 +73,7 @@ import de.hippokratius.myfeed.widget.WidgetEntries
 import de.hippokratius.myfeed.widget.WidgetEntry
 import java.io.File
 import java.util.Date
+import kotlinx.coroutines.launch
 
 /** Im Reader dürfen mehr verwandte Artikel gezeigt werden – die Reihe scrollt horizontal. */
 private const val READER_MAX_RELATED = 10
@@ -124,6 +130,13 @@ fun ReaderScreen(
 
     var menuOpen by remember { mutableStateOf(false) }
 
+    // Scroll-Zustand der Artikelliste; sichtbar gemacht für den "Zum Anfang"-FAB.
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val showScrollToTop by remember {
+        derivedStateOf { listState.firstVisibleItemIndex > 0 }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -175,6 +188,16 @@ fun ReaderScreen(
                 },
             )
         },
+        floatingActionButton = {
+            if (showScrollToTop) {
+                FloatingActionButton(onClick = { scope.launch { listState.animateScrollToItem(0) } }) {
+                    Icon(
+                        Icons.Default.KeyboardArrowUp,
+                        contentDescription = stringResource(R.string.action_scroll_to_top),
+                    )
+                }
+            }
+        },
     ) { padding ->
         PullToRefreshBox(
             isRefreshing = syncRunning,
@@ -205,7 +228,7 @@ fun ReaderScreen(
                             modifier = Modifier.padding(24.dp),
                         )
                     } else {
-                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                             items(entries, key = { it.stableId }) { entry ->
                                 when (entry) {
                                     is WidgetEntry.Single -> LargeArticleItem(
