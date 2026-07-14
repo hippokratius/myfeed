@@ -74,8 +74,8 @@ private const val READER_MAX_RELATED = 10
 
 /**
  * Fullscreen-Ansicht des Feeds: dieselben Inhalte wie das Widget (Einzelartikel
- * und Themen-Gruppen), aber als vollwertiger Reader in der App. Startbildschirm,
- * damit z. B. eine Kvaesitso-Wischgeste ("App öffnen") direkt hier landet.
+ * und Themen-Gruppen), aber als vollwertiger Reader in der App. Startbildschirm –
+ * die App öffnet direkt im Vollbild-Feed.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

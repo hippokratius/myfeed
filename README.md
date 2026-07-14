@@ -1,17 +1,10 @@
 # MyFeed
 
-Ein scrollbarer RSS-Reader als Android-App-Widget – gebaut für den
-[Kvaesitso-Launcher](https://kvaesitso.mm20.de/). Das Widget zeigt nur
-Überschriften und vereinzelt Bilder; Artikel, die vermutlich über dasselbe
-Thema berichten, werden zu einer Karte gruppiert (ähnlich dem News-Feed des
-Smart Launchers).
-
-> **Warum ein Widget und kein "echtes" Kvaesitso-Plugin?**
-> Die Kvaesitso-Plugin-API (SDK 2.x) unterstützt ausschließlich
-> Provider-Plugins (Wetter, Kalender, Kontakt-/Datei-/Orte-Suche) – ein Plugin
-> kann keine eigene scrollbare Seite im Launcher rendern. Kvaesitso bettet
-> aber beliebige Android-App-Widgets auf seinen Seiten ein. Genau das nutzt
-> diese App: ein scrollbares [Jetpack-Glance](https://developer.android.com/jetpack/compose/glance)-Widget.
+Ein scrollbarer RSS-Reader für Android – App mit Vollbild-Reader plus
+scrollbarem Home-Screen-Widget
+([Jetpack Glance](https://developer.android.com/jetpack/compose/glance)).
+Das Widget zeigt nur Überschriften und vereinzelt Bilder; Artikel, die
+vermutlich über dasselbe Thema berichten, werden zu einer Karte gruppiert.
 
 ## Features
 
@@ -40,33 +33,20 @@ Smart Launchers).
   (vordefiniert oder frei benannt); Filter-Chips in der Feed-Liste
 - **Widget pro Kategorie**: Jede Widget-Instanz zeigt wahlweise alle Feeds
   oder nur eine Kategorie – z. B. ein Tech- und ein Sport-Widget auf
-  verschiedenen Launcher-Seiten (Auswahl beim Platzieren, änderbar per
+  verschiedenen Home-Screen-Seiten (Auswahl beim Platzieren, änderbar per
   Long-Press → Neu konfigurieren)
+- **App-Shortcut „Feeds verwalten"**: per Long-Press auf das App-Icon direkt
+  in die Feed-Verwaltung springen
 - **Einstellungen**: Aktualisierungsintervall (15–180 min), Aufbewahrungsdauer,
   Bilder an/aus, Gruppierung an/aus
 - Unterstützt RSS 2.0, RSS 1.0 (RDF) und Atom; hell/dunkel folgt dem System
 
-## Vollbild-Reader per Kvaesitso-Geste öffnen
-
-Kvaesitso kann Wischgesten mit Aktionen belegen (Einstellungen → **Gesten**).
-Da die App direkt im Vollbild-Feed startet, genügt:
-
-1. Kvaesitso-Einstellungen → **Gesten** → gewünschte Geste (z. B.
-   *Nach links wischen*)
-2. **App starten** → **MyFeed** auswählen
-
-Ein Wisch öffnet dann den Feed im Vollbild. Kvaesitso kann Gesten auch mit
-**App-Shortcuts** belegen – die App bringt dafür den Shortcut
-**Feeds verwalten** mit, falls eine Geste direkt in die Feed-Verwaltung
-führen soll.
-
-## Widget in Kvaesitso einrichten
+## Widget einrichten
 
 1. App installieren und öffnen, Feeds hinzufügen (＋, **Feeds entdecken**
    oder OPML-Import)
-2. In Kvaesitso auf dem Startbildschirm nach unten scrollen → **Bearbeiten**
-   (Stift-Symbol) → **Widget hinzufügen**
-3. Unter **MyFeed** das Widget **RSS-Feed** auswählen
+2. Long-Press auf eine freie Stelle des Startbildschirms → **Widgets**
+3. Unter **MyFeed** das Widget **RSS-Feed** platzieren
 4. Beim Platzieren fragt das Widget, ob es alle Feeds oder nur eine
    Kategorie anzeigen soll
 5. Über den Widget-Rahmen die Höhe nach Wunsch anpassen – die Liste
