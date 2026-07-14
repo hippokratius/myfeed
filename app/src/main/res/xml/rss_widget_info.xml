@@ -8,6 +8,6 @@
     android:widgetCategory="home_screen"
     android:updatePeriodMillis="0"
     android:initialLayout="@layout/glance_default_loading_layout"
-    android:configure="de.hippokratius.kvaesitsorss.widget.WidgetConfigActivity"
+    android:configure="de.hippokratius.myfeed.widget.WidgetConfigActivity"
     android:widgetFeatures="reconfigurable|configuration_optional"
     android:description="@string/widget_description" />

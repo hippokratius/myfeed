@@ -14,7 +14,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "kvaesitso-rss"
+rootProject.name = "myfeed"
 
 include(":core")
 
