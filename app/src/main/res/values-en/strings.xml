@@ -77,6 +77,21 @@
     <string name="widget_no_articles_in_category">No articles in this category</string>
 
     <string name="reader_title">Your feed</string>
+    <string name="action_hide_read">Hide read articles</string>
+    <string name="action_show_read">Show read articles</string>
+    <string name="action_bookmark_add">Add bookmark</string>
+    <string name="action_bookmark_remove">Remove bookmark</string>
+
+    <string name="saved_title">Saved</string>
+    <string name="tab_bookmarks">Bookmarks</string>
+    <string name="tab_archive">Archive</string>
+    <string name="saved_empty_bookmarks">No bookmarks yet – tap the bookmark icon on an article to keep it here.</string>
+    <string name="saved_empty_archive">No opened articles yet – every article you open is archived here automatically.</string>
+
+    <string name="settings_archive_max_age">Keep archive for</string>
+    <string name="settings_archive_max_age_hint">Opened articles stay in the archive this long – independent of the regular retention period.</string>
+    <string name="settings_bookmark_max_age">Keep bookmarks for</string>
+    <string name="settings_bookmark_max_age_hint">Bookmarked articles are kept this long – independent of the archive and the regular retention period.</string>
     <string name="action_scroll_to_top">Jump to top</string>
     <string name="action_manage_feeds">Manage feeds</string>
     <string name="shortcut_feeds_short">Feeds</string>

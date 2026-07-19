@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.net.Uri
 import android.os.Build
 import android.text.format.DateFormat
 import android.text.format.DateUtils
@@ -22,6 +21,7 @@ import androidx.glance.LocalContext
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.ActionCallback
@@ -78,7 +78,13 @@ class RssWidget : GlanceAppWidget() {
         // Pro Widget-Instanz konfigurierte Kategorie; fehlt der Key, zeigt das Widget alles.
         val category = getAppWidgetState(context, PreferencesGlanceStateDefinition, id)[KEY_CATEGORY]
         val settings = app.graph.settingsRepository.current()
-        val data = WidgetEntries.buildData(app.graph.articleDao, app.graph.feedDao, category, settings.filterWords)
+        val data = WidgetEntries.buildData(
+            app.graph.articleDao,
+            app.graph.feedDao,
+            category,
+            settings.filterWords,
+            minPublishedAt = settings.feedCutoffMillis(System.currentTimeMillis()),
+        )
         val bitmaps = if (settings.showImages) {
             loadBitmaps(data)
         } else {
@@ -103,7 +109,7 @@ class RssWidget : GlanceAppWidget() {
 
         // Große Artikelbilder: Gruppen-Hauptartikel und neueste Einzelartikel zuerst.
         for (entry in data.entries) {
-            if (articleImages.size >= MAX_ARTICLE_BITMAPS) break
+            if (articleImages.size >= WidgetEntries.MAX_ARTICLE_BITMAPS) break
             val article = when (entry) {
                 is WidgetEntry.Single -> entry.article
                 is WidgetEntry.Group -> entry.main
@@ -112,9 +118,11 @@ class RssWidget : GlanceAppWidget() {
         }
 
         // Kleine Thumbnails für verwandte Artikel der obersten Gruppen.
-        for (entry in data.entries.filterIsInstance<WidgetEntry.Group>().take(MAX_GROUPS_WITH_THUMBS)) {
+        for (entry in data.entries.filterIsInstance<WidgetEntry.Group>()
+            .take(WidgetEntries.MAX_GROUPS_WITH_THUMBS)
+        ) {
             for (related in entry.related) {
-                if (relatedThumbs.size >= MAX_RELATED_BITMAPS) break
+                if (relatedThumbs.size >= WidgetEntries.MAX_RELATED_BITMAPS) break
                 decode(related.thumbPath)?.let { relatedThumbs[related.id] = it }
             }
         }
@@ -140,9 +148,6 @@ class RssWidget : GlanceAppWidget() {
     }
 
     companion object {
-        private const val MAX_ARTICLE_BITMAPS = 14
-        private const val MAX_RELATED_BITMAPS = 12
-        private const val MAX_GROUPS_WITH_THUMBS = 4
         private const val MAX_FEED_ICONS = 20
 
         /** Pro-Instanz-State: Kategorie-Filter dieses Widgets (fehlt = alle). */
@@ -151,6 +156,16 @@ class RssWidget : GlanceAppWidget() {
         suspend fun updateAll(context: Context) {
             RssWidget().updateAll(context)
         }
+
+        /**
+         * Kategorie-Filter aller aktuell platzierten Widget-Instanzen
+         * (null = alle Feeds). Leer, wenn kein Widget platziert ist – dann
+         * lädt der Sync auch keine Thumbnails vorab.
+         */
+        suspend fun configuredCategories(context: Context): List<String?> =
+            GlanceAppWidgetManager(context).getGlanceIds(RssWidget::class.java).map { id ->
+                getAppWidgetState(context, PreferencesGlanceStateDefinition, id)[KEY_CATEGORY]
+            }
     }
 }
 
@@ -263,11 +278,12 @@ private fun LargeArticle(
     image: Bitmap?,
     feedIcons: Map<Long, Bitmap>,
 ) {
+    val context = LocalContext.current
     Column(
         modifier = GlanceModifier
             .fillMaxWidth()
             .padding(vertical = 12.dp)
-            .clickable(openArticleAction(article.link)),
+            .clickable(openArticleAction(context, article)),
     ) {
         if (image != null) {
             var imageModifier = GlanceModifier.fillMaxWidth().height(160.dp)
@@ -335,6 +351,7 @@ private fun RelatedCard(
     thumb: Bitmap?,
     feedIcons: Map<Long, Bitmap>,
 ) {
+    val context = LocalContext.current
     var card = GlanceModifier
         .fillMaxWidth()
         .background(GlanceTheme.colors.surfaceVariant)
@@ -342,7 +359,7 @@ private fun RelatedCard(
         card = card.cornerRadius(12.dp)
     }
     Row(
-        modifier = card.padding(12.dp).clickable(openArticleAction(article.link)),
+        modifier = card.padding(12.dp).clickable(openArticleAction(context, article)),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = GlanceModifier.defaultWeight()) {
@@ -430,8 +447,12 @@ private fun EntryDivider() {
     )
 }
 
-private fun openArticleAction(link: String) =
-    actionStartActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
+/**
+ * Artikel-Taps laufen über die Trampolin-Activity, die den Artikel als
+ * archiviert markiert und dann den Browser öffnet.
+ */
+private fun openArticleAction(context: Context, article: ArticleEntity) =
+    actionStartActivity(OpenArticleActivity.intent(context, article.id, article.link))
 
 private fun openAppAction(context: Context) =
     actionStartActivity(Intent(context, MainActivity::class.java))

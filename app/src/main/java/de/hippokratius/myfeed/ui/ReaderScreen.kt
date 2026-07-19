@@ -51,11 +51,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -69,12 +72,17 @@ import de.hippokratius.myfeed.fetch.FeedFetchWorker
 import de.hippokratius.myfeed.settings.AppSettings
 import de.hippokratius.myfeed.widget.WidgetEntries
 import de.hippokratius.myfeed.widget.WidgetEntry
+import de.hippokratius.myfeed.widget.articles
 import java.io.File
 import java.util.Date
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 
 /** Im Reader dürfen mehr verwandte Artikel gezeigt werden – die Reihe scrollt horizontal. */
 private const val READER_MAX_RELATED = 10
+
+/** Deckkraft, mit der gelesene Artikel ausgegraut dargestellt werden. */
+private const val READ_ALPHA = 0.45f
 
 /**
  * Fullscreen-Ansicht des Feeds: dieselben Inhalte wie das Widget (Einzelartikel
@@ -89,6 +97,7 @@ fun ReaderScreen(
     onOpenDiscover: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenGroup: (String) -> Unit,
+    onOpenSaved: () -> Unit,
 ) {
     val context = LocalContext.current
     val feeds by graph.feedDao.observeAll().collectAsState(initial = emptyList())
@@ -101,21 +110,49 @@ fun ReaderScreen(
     // Auswahl das asynchrone Laden der Kategorien-Liste.
     val effectiveCategory = selectedCategory?.takeIf { it in categories }
 
-    val articlesFlow = remember(effectiveCategory) {
+    // Ohne Limit: Der Reader zeigt alle Artikel innerhalb der Aufbewahrungsdauer.
+    // Nur wegen Archiv/Lesezeichen länger aufbewahrte Artikel bleiben außen vor.
+    val articlesFlow = remember(effectiveCategory, settings.maxAgeDays) {
+        val cutoff = settings.feedCutoffMillis(System.currentTimeMillis())
         effectiveCategory.let { category ->
             if (category == null) {
-                graph.articleDao.observeNewest(WidgetEntries.SOURCE_LIMIT)
+                graph.articleDao.observeAllNewest(cutoff)
             } else {
-                graph.articleDao.observeNewestInCategory(category, WidgetEntries.SOURCE_LIMIT)
+                graph.articleDao.observeAllNewestInCategory(category, cutoff)
             }
         }
     }
     val articles by articlesFlow.collectAsState(initial = emptyList())
     val entries = remember(articles, settings.filterWords) {
-        WidgetEntries.fromArticles(articles, maxRelated = READER_MAX_RELATED, filterWords = settings.filterWords)
+        WidgetEntries.fromArticles(
+            articles,
+            maxRelated = READER_MAX_RELATED,
+            filterWords = settings.filterWords,
+            maxEntries = Int.MAX_VALUE,
+        )
+    }
+
+    // In dieser Sitzung gelesene Artikel bleiben trotz "Gelesene ausblenden"
+    // sichtbar, damit die Liste beim Scrollen nicht unter dem Finger springt.
+    var sessionReadIds by remember { mutableStateOf(setOf<Long>()) }
+    val visibleEntries = remember(entries, settings.hideRead, sessionReadIds) {
+        if (!settings.hideRead) {
+            entries
+        } else {
+            entries.filter { entry ->
+                entry.articles().any { !it.isRead || it.id in sessionReadIds }
+            }
+        }
     }
     val feedIcons = remember(feeds) {
         feeds.mapNotNull { feed -> feed.iconPath?.let { feed.id to it } }.toMap()
+    }
+
+    val onOpenArticle: (ArticleEntity) -> Unit = { article ->
+        openArticleAndArchive(context, graph, article)
+    }
+    val onToggleBookmark: (ArticleEntity) -> Unit = { article ->
+        toggleBookmark(graph, article)
     }
 
     // Beim Öffnen aktualisieren, wenn der letzte Sync älter als das Intervall ist.
@@ -131,6 +168,49 @@ fun ReaderScreen(
     val scope = rememberCoroutineScope()
     val showScrollToTop by remember {
         derivedStateOf { listState.firstVisibleItemIndex > 0 }
+    }
+
+    // Beim Kategoriewechsel nach oben springen, damit der Lese-Tracker die
+    // alte Scroll-Position nicht auf die neue Liste anwendet.
+    LaunchedEffect(effectiveCategory) {
+        listState.scrollToItem(0)
+    }
+
+    // Einträge, die in dieser Sitzung tatsächlich auf dem Bildschirm waren.
+    // Ohne diese Prüfung würden z. B. vom Sync oberhalb der Scroll-Position
+    // eingefügte neue Artikel sofort als "überscrollt" gelten, weil die
+    // LazyColumn die Position am sichtbaren Eintrag verankert und der Index
+    // aller darüberliegenden Einträge dadurch springt.
+    val seenStableIds = remember { mutableSetOf<Long>() }
+
+    // Lese-Tracking: Einträge gelten als gelesen, wenn sie sichtbar waren und
+    // dann komplett nach oben aus dem Bild gescrollt wurden. Geschrieben wird
+    // erst bei Scroll-Pause, damit DB-Updates (und die daraus folgenden
+    // Listen-Neuberechnungen) nicht mitten im Fling passieren.
+    LaunchedEffect(visibleEntries) {
+        snapshotFlow {
+            if (listState.isScrollInProgress) {
+                null
+            } else {
+                listState.firstVisibleItemIndex to
+                    listState.layoutInfo.visibleItemsInfo.map { it.key }
+            }
+        }
+            .filterNotNull()
+            .collect { (firstVisible, visibleKeys) ->
+                // Erst markieren, dann die aktuell sichtbaren Keys aufnehmen –
+                // sichtbar allein heißt noch nicht gelesen.
+                val ids = visibleEntries.take(firstVisible)
+                    .filter { it.stableId in seenStableIds }
+                    .flatMap { it.articles() }
+                    .filter { !it.isRead && it.id !in sessionReadIds }
+                    .map { it.id }
+                if (ids.isNotEmpty()) {
+                    sessionReadIds = sessionReadIds + ids
+                    graph.articleDao.markRead(ids, System.currentTimeMillis())
+                }
+                seenStableIds += visibleKeys.filterIsInstance<Long>()
+            }
     }
 
     Scaffold(
@@ -153,6 +233,26 @@ fun ReaderScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = {
+                            scope.launch { graph.settingsRepository.setHideRead(!settings.hideRead) }
+                        },
+                    ) {
+                        Icon(
+                            painter = painterResource(
+                                if (settings.hideRead) R.drawable.ic_visibility_off else R.drawable.ic_visibility,
+                            ),
+                            contentDescription = stringResource(
+                                if (settings.hideRead) R.string.action_show_read else R.string.action_hide_read,
+                            ),
+                        )
+                    }
+                    IconButton(onClick = onOpenSaved) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_bookmark),
+                            contentDescription = stringResource(R.string.saved_title),
+                        )
+                    }
                     IconButton(onClick = { FeedFetchWorker.syncNow(context) }) {
                         Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.action_refresh))
                     }
@@ -197,7 +297,7 @@ fun ReaderScreen(
                             onSelect = { selectedCategory = it },
                         )
                     }
-                    if (entries.isEmpty()) {
+                    if (visibleEntries.isEmpty()) {
                         Text(
                             text = stringResource(
                                 if (effectiveCategory == null) {
@@ -212,18 +312,22 @@ fun ReaderScreen(
                         )
                     } else {
                         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-                            items(entries, key = { it.stableId }) { entry ->
+                            items(visibleEntries, key = { it.stableId }) { entry ->
                                 when (entry) {
                                     is WidgetEntry.Single -> LargeArticleItem(
                                         article = entry.article,
                                         showImages = settings.showImages,
                                         iconPath = feedIcons[entry.article.feedId],
+                                        onOpen = onOpenArticle,
+                                        onToggleBookmark = onToggleBookmark,
                                     )
                                     is WidgetEntry.Group -> GroupItem(
                                         group = entry,
                                         showImages = settings.showImages,
                                         feedIcons = feedIcons,
                                         onOpenGroup = onOpenGroup,
+                                        onOpen = onOpenArticle,
+                                        onToggleBookmark = onToggleBookmark,
                                     )
                                 }
                                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -298,15 +402,19 @@ private fun LargeArticleItem(
     article: ArticleEntity,
     showImages: Boolean,
     iconPath: String?,
+    onOpen: (ArticleEntity) -> Unit,
+    onToggleBookmark: (ArticleEntity) -> Unit,
 ) {
-    val context = LocalContext.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { openLink(context, article.link) }
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .clickable { onOpen(article) }
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .alpha(if (article.isRead) READ_ALPHA else 1f),
     ) {
-        val imageModel: Any? = article.imageUrl ?: article.thumbPath?.let(::File)
+        // Lokales, kleines Thumbnail bevorzugen; das Remote-Bild lädt Coil nur
+        // als Fallback – lazy beim Scrollen und mit Memory-/Disk-Cache.
+        val imageModel: Any? = article.thumbPath?.let(::File) ?: article.imageUrl
         if (showImages && imageModel != null) {
             AsyncImage(
                 model = imageModel,
@@ -319,7 +427,7 @@ private fun LargeArticleItem(
             )
             Spacer(modifier = Modifier.height(10.dp))
         }
-        SourceLine(article, iconPath)
+        SourceLine(article, iconPath, onToggleBookmark)
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = article.title,
@@ -340,12 +448,16 @@ private fun GroupItem(
     showImages: Boolean,
     feedIcons: Map<Long, String>,
     onOpenGroup: (String) -> Unit,
+    onOpen: (ArticleEntity) -> Unit,
+    onToggleBookmark: (ArticleEntity) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         LargeArticleItem(
             article = group.main,
             showImages = showImages,
             iconPath = feedIcons[group.main.feedId],
+            onOpen = onOpen,
+            onToggleBookmark = onToggleBookmark,
         )
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
@@ -357,6 +469,8 @@ private fun GroupItem(
                     article = related,
                     showImages = showImages,
                     iconPath = feedIcons[related.feedId],
+                    onOpen = onOpen,
+                    onToggleBookmark = onToggleBookmark,
                 )
             }
         }
@@ -379,13 +493,14 @@ private fun RelatedCard(
     article: ArticleEntity,
     showImages: Boolean,
     iconPath: String?,
+    onOpen: (ArticleEntity) -> Unit,
+    onToggleBookmark: (ArticleEntity) -> Unit,
 ) {
-    val context = LocalContext.current
     Surface(
-        onClick = { openLink(context, article.link) },
+        onClick = { onOpen(article) },
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier.width(280.dp),
+        modifier = Modifier.width(280.dp).alpha(if (article.isRead) READ_ALPHA else 1f),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -402,10 +517,11 @@ private fun RelatedCard(
                         maxLines = 3,
                     )
                 }
-                if (showImages && article.thumbPath != null) {
+                val thumbModel: Any? = article.thumbPath?.let(::File) ?: article.imageUrl
+                if (showImages && thumbModel != null) {
                     Spacer(modifier = Modifier.width(10.dp))
                     AsyncImage(
-                        model = File(article.thumbPath),
+                        model = thumbModel,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
@@ -427,15 +543,20 @@ private fun RelatedCard(
                     maxLines = 1,
                     modifier = Modifier.weight(1f),
                 )
+                BookmarkIcon(article, tint = color, onToggleBookmark = onToggleBookmark)
                 ShareIcon(article, tint = color)
             }
         }
     }
 }
 
-/** Quellenzeile: kleines Feed-Logo (falls vorhanden), Name links, Zeit und Teilen rechts. */
+/** Quellenzeile: Feed-Logo und Name links, Zeit, Lesezeichen und Teilen rechts. */
 @Composable
-private fun SourceLine(article: ArticleEntity, iconPath: String?) {
+private fun SourceLine(
+    article: ArticleEntity,
+    iconPath: String?,
+    onToggleBookmark: (ArticleEntity) -> Unit,
+) {
     val color = MaterialTheme.colorScheme.onSurfaceVariant
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -450,8 +571,32 @@ private fun SourceLine(article: ArticleEntity, iconPath: String?) {
             maxLines = 1,
         )
         Spacer(modifier = Modifier.width(4.dp))
+        BookmarkIcon(article, tint = color, onToggleBookmark = onToggleBookmark)
         ShareIcon(article, tint = color)
     }
+}
+
+/** Lesezeichen-Umschalter, gleiche Kompaktform wie [ShareIcon]. */
+@Composable
+internal fun BookmarkIcon(
+    article: ArticleEntity,
+    tint: Color,
+    onToggleBookmark: (ArticleEntity) -> Unit,
+) {
+    Icon(
+        painter = painterResource(
+            if (article.isBookmarked) R.drawable.ic_bookmark else R.drawable.ic_bookmark_border,
+        ),
+        contentDescription = stringResource(
+            if (article.isBookmarked) R.string.action_bookmark_remove else R.string.action_bookmark_add,
+        ),
+        tint = if (article.isBookmarked) MaterialTheme.colorScheme.primary else tint,
+        modifier = Modifier
+            .clip(CircleShape)
+            .clickable { onToggleBookmark(article) }
+            .padding(6.dp)
+            .size(20.dp),
+    )
 }
 
 /** Feed-Logo (falls vorhanden) plus Quellenname mit Ellipse bei Platzmangel. */
@@ -507,6 +652,31 @@ private fun relativeTime(article: ArticleEntity): String =
 private fun openLink(context: android.content.Context, link: String) {
     runCatching {
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
+    }
+}
+
+/**
+ * Öffnet den Artikel im Browser und markiert ihn als archiviert – geöffnete
+ * Artikel bleiben so über die Lebensdauer des Feeds hinaus im Archiv auffindbar.
+ */
+internal fun openArticleAndArchive(
+    context: android.content.Context,
+    graph: AppGraph,
+    article: ArticleEntity,
+) {
+    graph.applicationScope.launch {
+        graph.articleDao.markArchived(article.id, System.currentTimeMillis())
+    }
+    openLink(context, article.link)
+}
+
+/** Setzt oder entfernt das Lesezeichen eines Artikels. */
+internal fun toggleBookmark(graph: AppGraph, article: ArticleEntity) {
+    graph.applicationScope.launch {
+        graph.articleDao.setBookmarked(
+            article.id,
+            if (article.isBookmarked) null else System.currentTimeMillis(),
+        )
     }
 }
 

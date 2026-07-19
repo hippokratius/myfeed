@@ -13,8 +13,10 @@ import de.hippokratius.myfeed.data.ArticleDao
 import de.hippokratius.myfeed.data.ArticleEntity
 import de.hippokratius.myfeed.data.FeedDao
 import de.hippokratius.myfeed.data.FeedEntity
+import de.hippokratius.myfeed.settings.AppSettings
 import de.hippokratius.myfeed.settings.SettingsRepository
 import de.hippokratius.myfeed.widget.RssWidget
+import de.hippokratius.myfeed.widget.WidgetEntries
 import java.io.ByteArrayInputStream
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
@@ -151,18 +153,24 @@ class FeedSyncer(
                     .onFailure { Log.w(TAG, "Feed ${feed.url} konnte nicht geladen werden", it) }
             }
 
-            articleDao.deleteOlderThan(now - TimeUnit.DAYS.toMillis(settings.maxAgeDays.toLong()))
+            // Archivierte und gemerkte Artikel überleben die normale Aufbewahrung
+            // und werden erst nach ihrer jeweils eigenen Frist entfernt.
+            articleDao.deleteOlderThan(settings.feedCutoffMillis(now))
+            articleDao.deleteSavedOlderThan(
+                minArchivedAt = settings.archiveCutoffMillis(now),
+                minBookmarkedAt = settings.bookmarkCutoffMillis(now),
+            )
             articleDao.enforceMaxCount(MAX_TOTAL_ARTICLES)
 
             if (settings.showImages) {
-                downloadThumbnails()
+                downloadThumbnails(settings)
             }
             thumbnailStore.prune(
                 validArticleIds = articleDao.allIds().toSet(),
                 validFeedIds = feedDao.getAll().map { it.id }.toSet(),
             )
 
-            regroup(settings.groupingEnabled)
+            regroup(settings)
             settingsRepository.setLastSyncMillis(System.currentTimeMillis())
             RssWidget.updateAll(context)
         }
@@ -171,7 +179,7 @@ class FeedSyncer(
     /** Gruppierung neu berechnen (auch ohne Netz-Sync, z. B. nach Settings-Änderung). */
     suspend fun regroupAndRefreshWidget() = withContext(Dispatchers.IO) {
         syncMutex.withLock {
-            regroup(settingsRepository.current().groupingEnabled)
+            regroup(settingsRepository.current())
             RssWidget.updateAll(context)
         }
     }
@@ -226,8 +234,28 @@ class FeedSyncer(
         .header("Accept", accept)
         .build()
 
-    private suspend fun downloadThumbnails() {
-        for (article in articleDao.withMissingThumbs(MAX_THUMB_DOWNLOADS_PER_SYNC)) {
+    /**
+     * Thumbnails werden nur noch für Artikel vorab geladen, deren Bitmaps ein
+     * tatsächlich platziertes Widget rendert – Widgets können nicht lazy laden.
+     * Die App selbst lädt Bilder on-demand beim Scrollen (Coil-Cache), ohne
+     * platzierte Widgets entsteht beim Sync also kein Bild-Traffic.
+     */
+    private suspend fun downloadThumbnails(settings: AppSettings) {
+        val categories = RssWidget.configuredCategories(context)
+        if (categories.isEmpty()) return
+
+        val cutoff = settings.feedCutoffMillis(System.currentTimeMillis())
+        val candidates = LinkedHashMap<Long, ArticleEntity>()
+        for (category in categories.distinct()) {
+            val entries = WidgetEntries.build(articleDao, category, settings.filterWords, cutoff)
+            for (article in WidgetEntries.thumbCandidates(entries)) {
+                if (article.thumbPath == null && article.imageUrl != null) {
+                    candidates.putIfAbsent(article.id, article)
+                }
+            }
+        }
+
+        for (article in candidates.values.take(MAX_THUMB_DOWNLOADS_PER_SYNC)) {
             val path = thumbnailStore.download(article.id, article.imageUrl ?: continue)
             if (path != null) {
                 articleDao.setThumbPath(article.id, path)
@@ -235,11 +263,14 @@ class FeedSyncer(
         }
     }
 
-    private suspend fun regroup(enabled: Boolean) {
+    private suspend fun regroup(settings: AppSettings) {
         articleDao.clearGroups()
-        if (!enabled) return
+        if (!settings.groupingEnabled) return
 
-        val candidates = articleDao.newest(GROUPING_ARTICLE_LIMIT).map {
+        // Nur Artikel innerhalb der normalen Aufbewahrung gruppieren – alte
+        // Archiv-/Lesezeichen-Artikel tauchen im Feed nicht mehr auf.
+        val cutoff = settings.feedCutoffMillis(System.currentTimeMillis())
+        val candidates = articleDao.newest(GROUPING_ARTICLE_LIMIT, cutoff).map {
             ClusterCandidate(it.id, it.title, it.publishedAt, sourceKey = it.feedId.toString())
         }
         for (group in clusterer.cluster(candidates)) {

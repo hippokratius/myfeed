@@ -14,13 +14,40 @@ import kotlinx.coroutines.flow.map
 data class AppSettings(
     val refreshIntervalMinutes: Int = 30,
     val maxAgeDays: Int = 7,
+    /**
+     * Aufbewahrung archivierter (geöffneter) Artikel in Tagen – immer
+     * mindestens so lang wie die normale Aufbewahrungsdauer.
+     */
+    val archiveMaxAgeDays: Int = 30,
+    /**
+     * Aufbewahrung von Artikeln mit Lesezeichen in Tagen – unabhängig vom
+     * Archiv einstellbar, ebenfalls nie kürzer als die normale Aufbewahrung.
+     */
+    val bookmarkMaxAgeDays: Int = 90,
     val showImages: Boolean = true,
     val groupingEnabled: Boolean = true,
+    /** Gelesene Artikel im Reader ausblenden statt nur ausgrauen. */
+    val hideRead: Boolean = false,
     /** Zeitpunkt des letzten erfolgreichen Syncs (Epoch-Millis, 0 = nie). */
     val lastSyncMillis: Long = 0,
     /** Artikel, deren Titel eines dieser Wörter enthält, werden ausgeblendet. */
     val filterWords: Set<String> = emptySet(),
-)
+) {
+    /** Ältestes publishedAt, das im normalen Feed noch angezeigt wird. */
+    fun feedCutoffMillis(now: Long): Long = now - maxAgeDays * DAY_MILLIS
+
+    /** Cutoff fürs Archiv – nie kürzer als die normale Aufbewahrung. */
+    fun archiveCutoffMillis(now: Long): Long =
+        now - maxOf(archiveMaxAgeDays, maxAgeDays) * DAY_MILLIS
+
+    /** Cutoff für Lesezeichen – nie kürzer als die normale Aufbewahrung. */
+    fun bookmarkCutoffMillis(now: Long): Long =
+        now - maxOf(bookmarkMaxAgeDays, maxAgeDays) * DAY_MILLIS
+
+    companion object {
+        private const val DAY_MILLIS = 24L * 60 * 60 * 1000
+    }
+}
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
 
@@ -29,8 +56,11 @@ class SettingsRepository(private val context: Context) {
     private object Keys {
         val refreshInterval = intPreferencesKey("refresh_interval_minutes")
         val maxAgeDays = intPreferencesKey("max_age_days")
+        val archiveMaxAgeDays = intPreferencesKey("archive_max_age_days")
+        val bookmarkMaxAgeDays = intPreferencesKey("bookmark_max_age_days")
         val showImages = booleanPreferencesKey("show_images")
         val groupingEnabled = booleanPreferencesKey("grouping_enabled")
+        val hideRead = booleanPreferencesKey("hide_read")
         val lastSync = longPreferencesKey("last_sync_millis")
         val filterWords = stringSetPreferencesKey("filter_words")
     }
@@ -39,8 +69,11 @@ class SettingsRepository(private val context: Context) {
         AppSettings(
             refreshIntervalMinutes = prefs[Keys.refreshInterval] ?: 30,
             maxAgeDays = prefs[Keys.maxAgeDays] ?: 7,
+            archiveMaxAgeDays = prefs[Keys.archiveMaxAgeDays] ?: 30,
+            bookmarkMaxAgeDays = prefs[Keys.bookmarkMaxAgeDays] ?: 90,
             showImages = prefs[Keys.showImages] ?: true,
             groupingEnabled = prefs[Keys.groupingEnabled] ?: true,
+            hideRead = prefs[Keys.hideRead] ?: false,
             lastSyncMillis = prefs[Keys.lastSync] ?: 0,
             filterWords = prefs[Keys.filterWords] ?: emptySet(),
         )
@@ -54,6 +87,18 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setMaxAgeDays(days: Int) {
         context.dataStore.edit { it[Keys.maxAgeDays] = days }
+    }
+
+    suspend fun setArchiveMaxAgeDays(days: Int) {
+        context.dataStore.edit { it[Keys.archiveMaxAgeDays] = days }
+    }
+
+    suspend fun setBookmarkMaxAgeDays(days: Int) {
+        context.dataStore.edit { it[Keys.bookmarkMaxAgeDays] = days }
+    }
+
+    suspend fun setHideRead(hide: Boolean) {
+        context.dataStore.edit { it[Keys.hideRead] = hide }
     }
 
     suspend fun setShowImages(show: Boolean) {

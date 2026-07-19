@@ -47,6 +47,9 @@ import kotlinx.coroutines.launch
 private val REFRESH_INTERVALS = listOf(15, 30, 60, 180)
 private val MAX_AGES = listOf(3, 7, 14)
 
+/** Verlängerte Aufbewahrung für Archiv bzw. Lesezeichen – länger als der Feed. */
+private val SAVED_MAX_AGES = listOf(14, 30, 90, 365)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -96,6 +99,44 @@ fun SettingsScreen(
                     selected = settings.maxAgeDays == days,
                     onClick = {
                         scope.launch { graph.settingsRepository.setMaxAgeDays(days) }
+                    },
+                )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+            SectionTitle(stringResource(R.string.settings_archive_max_age))
+            Text(
+                text = stringResource(R.string.settings_archive_max_age_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+            SAVED_MAX_AGES.forEach { days ->
+                RadioRow(
+                    label = stringResource(R.string.settings_days, days),
+                    selected = settings.archiveMaxAgeDays == days,
+                    onClick = {
+                        scope.launch { graph.settingsRepository.setArchiveMaxAgeDays(days) }
+                    },
+                )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+            SectionTitle(stringResource(R.string.settings_bookmark_max_age))
+            Text(
+                text = stringResource(R.string.settings_bookmark_max_age_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+            SAVED_MAX_AGES.forEach { days ->
+                RadioRow(
+                    label = stringResource(R.string.settings_days, days),
+                    selected = settings.bookmarkMaxAgeDays == days,
+                    onClick = {
+                        scope.launch { graph.settingsRepository.setBookmarkMaxAgeDays(days) }
                     },
                 )
             }

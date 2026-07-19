@@ -24,6 +24,17 @@ vermutlich über dasselbe Thema berichten, werden zu einer Karte gruppiert.
   (Horizontal scrollbare Listen sind in App-Widgets technisch nicht möglich,
   daher die vertikale Kompakt-Darstellung.)
 - **Tap = Browser**: Jeder Artikel öffnet direkt im Browser
+- **Gelesen-Status**: Der Reader zeigt alle Artikel (kein 40er-Limit mehr);
+  Artikel, über die von oben nach unten hinweggescrollt wurde, gelten als
+  gelesen, werden ausgegraut dargestellt und lassen sich per Augen-Symbol
+  in der Titelzeile ausblenden
+- **Archiv**: Geöffnete (angetippte) Artikel – auch aus dem Widget – werden
+  automatisch archiviert und bleiben über die normale Aufbewahrungsdauer
+  hinaus in der Archiv-Liste auffindbar
+- **Lesezeichen**: Artikel lassen sich per Lesezeichen-Symbol in eine
+  Extraliste speichern; die Aufbewahrungsdauern für Archiv und Lesezeichen
+  sind länger als die des Feeds und in den Einstellungen jeweils separat
+  wählbar
 - **Feeds entdecken**: kuratierter Katalog bekannter deutsch- und
   englischsprachiger Feeds (Tagesschau, heise, BBC, …), nach Kategorien
   gruppiert, mit Ein-Tipp-Hinzufügen
@@ -37,8 +48,9 @@ vermutlich über dasselbe Thema berichten, werden zu einer Karte gruppiert.
   Long-Press → Neu konfigurieren)
 - **App-Shortcut „Feeds verwalten"**: per Long-Press auf das App-Icon direkt
   in die Feed-Verwaltung springen
-- **Einstellungen**: Aktualisierungsintervall (15–180 min), Aufbewahrungsdauer,
-  Bilder an/aus, Gruppierung an/aus
+- **Einstellungen**: Aktualisierungsintervall (15–180 min), Aufbewahrungsdauer
+  (Feed, Archiv und Lesezeichen jeweils separat), Bilder an/aus,
+  Gruppierung an/aus
 - Unterstützt RSS 2.0, RSS 1.0 (RDF) und Atom; hell/dunkel folgt dem System
 
 ## Widget einrichten
@@ -91,7 +103,9 @@ core/  Reines Kotlin/JVM, ohne Android-Abhängigkeiten (JVM-getestet):
 app/   Android-App:
        ├── data/      Room (Feeds, Artikel)
        ├── settings/  DataStore-Einstellungen
-       ├── fetch/     WorkManager-Sync, OkHttp, Thumbnail-Cache (≤400 px JPEG)
+       ├── fetch/     WorkManager-Sync, OkHttp, Thumbnail-Cache (≤400 px JPEG,
+       │              nur für platzierte Widgets vorab; die App lädt Bilder
+       │              lazy beim Scrollen über den Coil-Cache)
        ├── widget/    Glance-Widget (LazyColumn, Gruppen-Karten, Refresh)
        └── ui/        Compose: Vollbild-Reader, Feed-Verwaltung, OPML,
                       Einstellungen, Gruppen-Ansicht

@@ -54,7 +54,11 @@ class MainActivity : ComponentActivity() {
                             onOpenGroup = { groupId ->
                                 navController.navigate("group/${URLEncoder.encode(groupId, "UTF-8")}")
                             },
+                            onOpenSaved = { navController.navigate("saved") },
                         )
+                    }
+                    composable("saved") {
+                        SavedScreen(graph = graph, onBack = { navController.popBackStack() })
                     }
                     composable(
                         route = "feeds?tab={tab}",
