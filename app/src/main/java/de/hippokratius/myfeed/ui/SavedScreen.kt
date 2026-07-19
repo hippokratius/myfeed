@@ -41,6 +41,7 @@ import coil.compose.AsyncImage
 import de.hippokratius.myfeed.AppGraph
 import de.hippokratius.myfeed.R
 import de.hippokratius.myfeed.data.ArticleEntity
+import de.hippokratius.myfeed.settings.AppSettings
 import java.io.File
 
 /**
@@ -58,6 +59,7 @@ fun SavedScreen(
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val bookmarked by graph.articleDao.observeBookmarked().collectAsState(initial = emptyList())
     val archived by graph.articleDao.observeArchived().collectAsState(initial = emptyList())
+    val settings by graph.settingsRepository.settings.collectAsState(initial = AppSettings())
 
     Scaffold(
         topBar = {
@@ -104,7 +106,7 @@ fun SavedScreen(
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(articles, key = { it.id }) { article ->
-                        SavedArticleRow(article, graph)
+                        SavedArticleRow(article, graph, settings.showImages)
                         HorizontalDivider()
                     }
                 }
@@ -114,7 +116,7 @@ fun SavedScreen(
 }
 
 @Composable
-private fun SavedArticleRow(article: ArticleEntity, graph: AppGraph) {
+private fun SavedArticleRow(article: ArticleEntity, graph: AppGraph, showImages: Boolean) {
     val context = LocalContext.current
     Row(
         modifier = Modifier
@@ -139,9 +141,11 @@ private fun SavedArticleRow(article: ArticleEntity, graph: AppGraph) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        if (article.thumbPath != null) {
+        // Lokales Thumb zuerst, sonst lädt Coil das Remote-Bild lazy (gecacht).
+        val thumbModel: Any? = article.thumbPath?.let(::File) ?: article.imageUrl
+        if (showImages && thumbModel != null) {
             AsyncImage(
-                model = File(article.thumbPath),
+                model = thumbModel,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier

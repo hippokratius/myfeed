@@ -147,12 +147,6 @@ interface ArticleDao {
     @Query("UPDATE articles SET thumbPath = :path WHERE id = :id")
     suspend fun setThumbPath(id: Long, path: String?)
 
-    @Query(
-        "SELECT * FROM articles WHERE thumbPath IS NULL AND imageUrl IS NOT NULL " +
-            "ORDER BY publishedAt DESC LIMIT :limit",
-    )
-    suspend fun withMissingThumbs(limit: Int): List<ArticleEntity>
-
     @Query("SELECT id FROM articles")
     suspend fun allIds(): List<Long>
 }

@@ -21,6 +21,7 @@ import androidx.glance.LocalContext
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.ActionCallback
@@ -108,7 +109,7 @@ class RssWidget : GlanceAppWidget() {
 
         // Große Artikelbilder: Gruppen-Hauptartikel und neueste Einzelartikel zuerst.
         for (entry in data.entries) {
-            if (articleImages.size >= MAX_ARTICLE_BITMAPS) break
+            if (articleImages.size >= WidgetEntries.MAX_ARTICLE_BITMAPS) break
             val article = when (entry) {
                 is WidgetEntry.Single -> entry.article
                 is WidgetEntry.Group -> entry.main
@@ -117,9 +118,11 @@ class RssWidget : GlanceAppWidget() {
         }
 
         // Kleine Thumbnails für verwandte Artikel der obersten Gruppen.
-        for (entry in data.entries.filterIsInstance<WidgetEntry.Group>().take(MAX_GROUPS_WITH_THUMBS)) {
+        for (entry in data.entries.filterIsInstance<WidgetEntry.Group>()
+            .take(WidgetEntries.MAX_GROUPS_WITH_THUMBS)
+        ) {
             for (related in entry.related) {
-                if (relatedThumbs.size >= MAX_RELATED_BITMAPS) break
+                if (relatedThumbs.size >= WidgetEntries.MAX_RELATED_BITMAPS) break
                 decode(related.thumbPath)?.let { relatedThumbs[related.id] = it }
             }
         }
@@ -145,9 +148,6 @@ class RssWidget : GlanceAppWidget() {
     }
 
     companion object {
-        private const val MAX_ARTICLE_BITMAPS = 14
-        private const val MAX_RELATED_BITMAPS = 12
-        private const val MAX_GROUPS_WITH_THUMBS = 4
         private const val MAX_FEED_ICONS = 20
 
         /** Pro-Instanz-State: Kategorie-Filter dieses Widgets (fehlt = alle). */
@@ -156,6 +156,16 @@ class RssWidget : GlanceAppWidget() {
         suspend fun updateAll(context: Context) {
             RssWidget().updateAll(context)
         }
+
+        /**
+         * Kategorie-Filter aller aktuell platzierten Widget-Instanzen
+         * (null = alle Feeds). Leer, wenn kein Widget platziert ist – dann
+         * lädt der Sync auch keine Thumbnails vorab.
+         */
+        suspend fun configuredCategories(context: Context): List<String?> =
+            GlanceAppWidgetManager(context).getGlanceIds(RssWidget::class.java).map { id ->
+                getAppWidgetState(context, PreferencesGlanceStateDefinition, id)[KEY_CATEGORY]
+            }
     }
 }
 

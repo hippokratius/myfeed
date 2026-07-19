@@ -49,6 +49,12 @@ object WidgetEntries {
     const val MAX_RELATED_SHOWN = 3
     const val SOURCE_LIMIT = 150
 
+    // Bitmap-Budget des Widgets (RemoteViews-Speicher ist knapp). Bestimmt
+    // zugleich, welche Thumbnails der Sync vorab herunterlädt.
+    const val MAX_ARTICLE_BITMAPS = 14
+    const val MAX_RELATED_BITMAPS = 12
+    const val MAX_GROUPS_WITH_THUMBS = 4
+
     suspend fun buildData(
         articleDao: ArticleDao,
         feedDao: FeedDao,
@@ -118,5 +124,30 @@ object WidgetEntries {
         visible.filter { it.groupId == null }.forEach { entries += WidgetEntry.Single(it) }
 
         return entries.sortedByDescending { it.sortKey }.take(maxEntries)
+    }
+
+    /**
+     * Genau die Artikel, für die das Widget Bitmaps rendert (Haupt-/Einzel-
+     * artikel bis [MAX_ARTICLE_BITMAPS], verwandte Artikel der obersten
+     * [MAX_GROUPS_WITH_THUMBS] Gruppen bis [MAX_RELATED_BITMAPS]) – nur für
+     * diese lädt der Sync Thumbnails vorab herunter.
+     */
+    fun thumbCandidates(entries: List<WidgetEntry>): List<ArticleEntity> {
+        val candidates = mutableListOf<ArticleEntity>()
+        entries.take(MAX_ARTICLE_BITMAPS).forEach { entry ->
+            candidates += when (entry) {
+                is WidgetEntry.Single -> entry.article
+                is WidgetEntry.Group -> entry.main
+            }
+        }
+        var relatedCount = 0
+        for (entry in entries.filterIsInstance<WidgetEntry.Group>().take(MAX_GROUPS_WITH_THUMBS)) {
+            for (related in entry.related) {
+                if (relatedCount >= MAX_RELATED_BITMAPS) break
+                candidates += related
+                relatedCount++
+            }
+        }
+        return candidates
     }
 }

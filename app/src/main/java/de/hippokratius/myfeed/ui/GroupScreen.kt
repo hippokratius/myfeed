@@ -72,7 +72,7 @@ fun GroupScreen(
     ) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
             items(articles, key = { it.id }) { article ->
-                ArticleRow(article, graph)
+                ArticleRow(article, graph, settings.showImages)
                 HorizontalDivider()
             }
         }
@@ -80,7 +80,7 @@ fun GroupScreen(
 }
 
 @Composable
-private fun ArticleRow(article: ArticleEntity, graph: AppGraph) {
+private fun ArticleRow(article: ArticleEntity, graph: AppGraph, showImages: Boolean) {
     val context = LocalContext.current
     Row(
         modifier = Modifier
@@ -106,9 +106,11 @@ private fun ArticleRow(article: ArticleEntity, graph: AppGraph) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        if (article.thumbPath != null) {
+        // Lokales Thumb zuerst, sonst lädt Coil das Remote-Bild lazy (gecacht).
+        val thumbModel: Any? = article.thumbPath?.let(::File) ?: article.imageUrl
+        if (showImages && thumbModel != null) {
             AsyncImage(
-                model = File(article.thumbPath),
+                model = thumbModel,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier

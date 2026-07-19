@@ -103,7 +103,9 @@ core/  Reines Kotlin/JVM, ohne Android-Abhängigkeiten (JVM-getestet):
 app/   Android-App:
        ├── data/      Room (Feeds, Artikel)
        ├── settings/  DataStore-Einstellungen
-       ├── fetch/     WorkManager-Sync, OkHttp, Thumbnail-Cache (≤400 px JPEG)
+       ├── fetch/     WorkManager-Sync, OkHttp, Thumbnail-Cache (≤400 px JPEG,
+       │              nur für platzierte Widgets vorab; die App lädt Bilder
+       │              lazy beim Scrollen über den Coil-Cache)
        ├── widget/    Glance-Widget (LazyColumn, Gruppen-Karten, Refresh)
        └── ui/        Compose: Vollbild-Reader, Feed-Verwaltung, OPML,
                       Einstellungen, Gruppen-Ansicht

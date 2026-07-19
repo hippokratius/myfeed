@@ -16,6 +16,7 @@ import de.hippokratius.myfeed.data.FeedEntity
 import de.hippokratius.myfeed.settings.AppSettings
 import de.hippokratius.myfeed.settings.SettingsRepository
 import de.hippokratius.myfeed.widget.RssWidget
+import de.hippokratius.myfeed.widget.WidgetEntries
 import java.io.ByteArrayInputStream
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
@@ -162,7 +163,7 @@ class FeedSyncer(
             articleDao.enforceMaxCount(MAX_TOTAL_ARTICLES)
 
             if (settings.showImages) {
-                downloadThumbnails()
+                downloadThumbnails(settings)
             }
             thumbnailStore.prune(
                 validArticleIds = articleDao.allIds().toSet(),
@@ -233,8 +234,28 @@ class FeedSyncer(
         .header("Accept", accept)
         .build()
 
-    private suspend fun downloadThumbnails() {
-        for (article in articleDao.withMissingThumbs(MAX_THUMB_DOWNLOADS_PER_SYNC)) {
+    /**
+     * Thumbnails werden nur noch für Artikel vorab geladen, deren Bitmaps ein
+     * tatsächlich platziertes Widget rendert – Widgets können nicht lazy laden.
+     * Die App selbst lädt Bilder on-demand beim Scrollen (Coil-Cache), ohne
+     * platzierte Widgets entsteht beim Sync also kein Bild-Traffic.
+     */
+    private suspend fun downloadThumbnails(settings: AppSettings) {
+        val categories = RssWidget.configuredCategories(context)
+        if (categories.isEmpty()) return
+
+        val cutoff = settings.feedCutoffMillis(System.currentTimeMillis())
+        val candidates = LinkedHashMap<Long, ArticleEntity>()
+        for (category in categories.distinct()) {
+            val entries = WidgetEntries.build(articleDao, category, settings.filterWords, cutoff)
+            for (article in WidgetEntries.thumbCandidates(entries)) {
+                if (article.thumbPath == null && article.imageUrl != null) {
+                    candidates.putIfAbsent(article.id, article)
+                }
+            }
+        }
+
+        for (article in candidates.values.take(MAX_THUMB_DOWNLOADS_PER_SYNC)) {
             val path = thumbnailStore.download(article.id, article.imageUrl ?: continue)
             if (path != null) {
                 articleDao.setThumbPath(article.id, path)

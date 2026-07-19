@@ -75,6 +75,7 @@ import de.hippokratius.myfeed.widget.WidgetEntry
 import de.hippokratius.myfeed.widget.articles
 import java.io.File
 import java.util.Date
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 
 /** Im Reader dürfen mehr verwandte Artikel gezeigt werden – die Reihe scrollt horizontal. */
@@ -176,19 +177,23 @@ fun ReaderScreen(
     }
 
     // Lese-Tracking: Einträge, die komplett nach oben aus dem Bild gescrollt
-    // wurden (von oben nach unten überscrollt), gelten als gelesen.
+    // wurden (von oben nach unten überscrollt), gelten als gelesen. Geschrieben
+    // wird erst bei Scroll-Pause, damit DB-Updates (und die daraus folgenden
+    // Listen-Neuberechnungen) nicht mitten im Fling passieren.
     LaunchedEffect(visibleEntries) {
-        snapshotFlow { listState.firstVisibleItemIndex }.collect { firstVisible ->
-            if (firstVisible <= 0) return@collect
-            val ids = visibleEntries.take(firstVisible)
-                .flatMap { it.articles() }
-                .filter { !it.isRead && it.id !in sessionReadIds }
-                .map { it.id }
-            if (ids.isNotEmpty()) {
-                sessionReadIds = sessionReadIds + ids
-                graph.articleDao.markRead(ids, System.currentTimeMillis())
+        snapshotFlow { listState.isScrollInProgress to listState.firstVisibleItemIndex }
+            .filter { (scrolling, _) -> !scrolling }
+            .collect { (_, firstVisible) ->
+                if (firstVisible <= 0) return@collect
+                val ids = visibleEntries.take(firstVisible)
+                    .flatMap { it.articles() }
+                    .filter { !it.isRead && it.id !in sessionReadIds }
+                    .map { it.id }
+                if (ids.isNotEmpty()) {
+                    sessionReadIds = sessionReadIds + ids
+                    graph.articleDao.markRead(ids, System.currentTimeMillis())
+                }
             }
-        }
     }
 
     Scaffold(
@@ -390,7 +395,9 @@ private fun LargeArticleItem(
             .padding(horizontal = 16.dp, vertical = 14.dp)
             .alpha(if (article.isRead) READ_ALPHA else 1f),
     ) {
-        val imageModel: Any? = article.imageUrl ?: article.thumbPath?.let(::File)
+        // Lokales, kleines Thumbnail bevorzugen; das Remote-Bild lädt Coil nur
+        // als Fallback – lazy beim Scrollen und mit Memory-/Disk-Cache.
+        val imageModel: Any? = article.thumbPath?.let(::File) ?: article.imageUrl
         if (showImages && imageModel != null) {
             AsyncImage(
                 model = imageModel,
@@ -493,10 +500,11 @@ private fun RelatedCard(
                         maxLines = 3,
                     )
                 }
-                if (showImages && article.thumbPath != null) {
+                val thumbModel: Any? = article.thumbPath?.let(::File) ?: article.imageUrl
+                if (showImages && thumbModel != null) {
                     Spacer(modifier = Modifier.width(10.dp))
                     AsyncImage(
-                        model = File(article.thumbPath),
+                        model = thumbModel,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
