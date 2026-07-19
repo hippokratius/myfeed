@@ -153,9 +153,12 @@ class FeedSyncer(
             }
 
             // Archivierte und gemerkte Artikel überleben die normale Aufbewahrung
-            // und werden erst nach der verlängerten Frist entfernt.
+            // und werden erst nach ihrer jeweils eigenen Frist entfernt.
             articleDao.deleteOlderThan(settings.feedCutoffMillis(now))
-            articleDao.deleteSavedOlderThan(settings.savedCutoffMillis(now))
+            articleDao.deleteSavedOlderThan(
+                minArchivedAt = settings.archiveCutoffMillis(now),
+                minBookmarkedAt = settings.bookmarkCutoffMillis(now),
+            )
             articleDao.enforceMaxCount(MAX_TOTAL_ARTICLES)
 
             if (settings.showImages) {

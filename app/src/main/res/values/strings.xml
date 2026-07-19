@@ -88,8 +88,10 @@
     <string name="saved_empty_bookmarks">Noch keine Lesezeichen – tippe bei einem Artikel auf das Lesezeichen-Symbol, um ihn hier zu speichern.</string>
     <string name="saved_empty_archive">Noch keine geöffneten Artikel – jeder Artikel, den du öffnest, landet automatisch hier im Archiv.</string>
 
-    <string name="settings_saved_max_age">Archiv &amp; Lesezeichen aufbewahren</string>
-    <string name="settings_saved_max_age_hint">Geöffnete und mit Lesezeichen versehene Artikel bleiben so lange erhalten – unabhängig von der normalen Aufbewahrungsdauer.</string>
+    <string name="settings_archive_max_age">Archiv aufbewahren</string>
+    <string name="settings_archive_max_age_hint">Geöffnete Artikel bleiben so lange im Archiv erhalten – unabhängig von der normalen Aufbewahrungsdauer.</string>
+    <string name="settings_bookmark_max_age">Lesezeichen aufbewahren</string>
+    <string name="settings_bookmark_max_age_hint">Artikel mit Lesezeichen bleiben so lange erhalten – unabhängig von Archiv und normaler Aufbewahrungsdauer.</string>
     <string name="action_scroll_to_top">Zum Anfang springen</string>
     <string name="action_manage_feeds">Feeds verwalten</string>
     <string name="shortcut_feeds_short">Feeds</string>

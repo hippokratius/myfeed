@@ -118,15 +118,17 @@ interface ArticleDao {
     suspend fun deleteOlderThan(minPublishedAt: Long)
 
     /**
-     * Aufräumen für Archiv und Lesezeichen: gelöscht wird erst, wenn sowohl das
-     * Archivieren als auch das Lesezeichen länger als die verlängerte
-     * Aufbewahrungsdauer zurückliegen.
+     * Aufräumen für Archiv und Lesezeichen mit getrennten Fristen: Ein Artikel
+     * bleibt erhalten, solange ihn mindestens eine der beiden Aufbewahrungen
+     * noch schützt – gelöscht wird erst, wenn das Archivieren älter als
+     * [minArchivedAt] und das Lesezeichen älter als [minBookmarkedAt] ist.
      */
     @Query(
         "DELETE FROM articles WHERE (archivedAt IS NOT NULL OR bookmarkedAt IS NOT NULL) " +
-            "AND MAX(COALESCE(archivedAt, 0), COALESCE(bookmarkedAt, 0)) < :minSavedAt",
+            "AND (archivedAt IS NULL OR archivedAt < :minArchivedAt) " +
+            "AND (bookmarkedAt IS NULL OR bookmarkedAt < :minBookmarkedAt)",
     )
-    suspend fun deleteSavedOlderThan(minSavedAt: Long)
+    suspend fun deleteSavedOlderThan(minArchivedAt: Long, minBookmarkedAt: Long)
 
     @Query(
         "DELETE FROM articles WHERE archivedAt IS NULL AND bookmarkedAt IS NULL " +

@@ -32,8 +32,9 @@ vermutlich über dasselbe Thema berichten, werden zu einer Karte gruppiert.
   automatisch archiviert und bleiben über die normale Aufbewahrungsdauer
   hinaus in der Archiv-Liste auffindbar
 - **Lesezeichen**: Artikel lassen sich per Lesezeichen-Symbol in eine
-  Extraliste speichern; die Aufbewahrungsdauer für Archiv und Lesezeichen
-  ist länger als die des Feeds und in den Einstellungen wählbar
+  Extraliste speichern; die Aufbewahrungsdauern für Archiv und Lesezeichen
+  sind länger als die des Feeds und in den Einstellungen jeweils separat
+  wählbar
 - **Feeds entdecken**: kuratierter Katalog bekannter deutsch- und
   englischsprachiger Feeds (Tagesschau, heise, BBC, …), nach Kategorien
   gruppiert, mit Ein-Tipp-Hinzufügen
@@ -48,7 +49,8 @@ vermutlich über dasselbe Thema berichten, werden zu einer Karte gruppiert.
 - **App-Shortcut „Feeds verwalten"**: per Long-Press auf das App-Icon direkt
   in die Feed-Verwaltung springen
 - **Einstellungen**: Aktualisierungsintervall (15–180 min), Aufbewahrungsdauer
-  (Feed sowie separat Archiv & Lesezeichen), Bilder an/aus, Gruppierung an/aus
+  (Feed, Archiv und Lesezeichen jeweils separat), Bilder an/aus,
+  Gruppierung an/aus
 - Unterstützt RSS 2.0, RSS 1.0 (RDF) und Atom; hell/dunkel folgt dem System
 
 ## Widget einrichten
