@@ -75,7 +75,7 @@ import de.hippokratius.myfeed.widget.WidgetEntry
 import de.hippokratius.myfeed.widget.articles
 import java.io.File
 import java.util.Date
-import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 
 /** Im Reader dürfen mehr verwandte Artikel gezeigt werden – die Reihe scrollt horizontal. */
@@ -176,16 +176,32 @@ fun ReaderScreen(
         listState.scrollToItem(0)
     }
 
-    // Lese-Tracking: Einträge, die komplett nach oben aus dem Bild gescrollt
-    // wurden (von oben nach unten überscrollt), gelten als gelesen. Geschrieben
-    // wird erst bei Scroll-Pause, damit DB-Updates (und die daraus folgenden
+    // Einträge, die in dieser Sitzung tatsächlich auf dem Bildschirm waren.
+    // Ohne diese Prüfung würden z. B. vom Sync oberhalb der Scroll-Position
+    // eingefügte neue Artikel sofort als "überscrollt" gelten, weil die
+    // LazyColumn die Position am sichtbaren Eintrag verankert und der Index
+    // aller darüberliegenden Einträge dadurch springt.
+    val seenStableIds = remember { mutableSetOf<Long>() }
+
+    // Lese-Tracking: Einträge gelten als gelesen, wenn sie sichtbar waren und
+    // dann komplett nach oben aus dem Bild gescrollt wurden. Geschrieben wird
+    // erst bei Scroll-Pause, damit DB-Updates (und die daraus folgenden
     // Listen-Neuberechnungen) nicht mitten im Fling passieren.
     LaunchedEffect(visibleEntries) {
-        snapshotFlow { listState.isScrollInProgress to listState.firstVisibleItemIndex }
-            .filter { (scrolling, _) -> !scrolling }
-            .collect { (_, firstVisible) ->
-                if (firstVisible <= 0) return@collect
+        snapshotFlow {
+            if (listState.isScrollInProgress) {
+                null
+            } else {
+                listState.firstVisibleItemIndex to
+                    listState.layoutInfo.visibleItemsInfo.map { it.key }
+            }
+        }
+            .filterNotNull()
+            .collect { (firstVisible, visibleKeys) ->
+                // Erst markieren, dann die aktuell sichtbaren Keys aufnehmen –
+                // sichtbar allein heißt noch nicht gelesen.
                 val ids = visibleEntries.take(firstVisible)
+                    .filter { it.stableId in seenStableIds }
                     .flatMap { it.articles() }
                     .filter { !it.isRead && it.id !in sessionReadIds }
                     .map { it.id }
@@ -193,6 +209,7 @@ fun ReaderScreen(
                     sessionReadIds = sessionReadIds + ids
                     graph.articleDao.markRead(ids, System.currentTimeMillis())
                 }
+                seenStableIds += visibleKeys.filterIsInstance<Long>()
             }
     }
 
