@@ -25,9 +25,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
@@ -213,6 +216,8 @@ fun ReaderScreen(
             }
     }
 
+    var menuExpanded by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -233,39 +238,69 @@ fun ReaderScreen(
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = {
-                            scope.launch { graph.settingsRepository.setHideRead(!settings.hideRead) }
-                        },
-                    ) {
-                        Icon(
-                            painter = painterResource(
-                                if (settings.hideRead) R.drawable.ic_visibility_off else R.drawable.ic_visibility,
-                            ),
-                            contentDescription = stringResource(
-                                if (settings.hideRead) R.string.action_show_read else R.string.action_hide_read,
-                            ),
-                        )
-                    }
-                    IconButton(onClick = onOpenSaved) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_bookmark),
-                            contentDescription = stringResource(R.string.saved_title),
-                        )
-                    }
                     IconButton(onClick = { FeedFetchWorker.syncNow(context) }) {
                         Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.action_refresh))
                     }
-                    IconButton(onClick = onOpenFeeds) {
+                    IconButton(onClick = { menuExpanded = true }) {
                         Icon(
-                            Icons.AutoMirrored.Filled.List,
-                            contentDescription = stringResource(R.string.action_manage_feeds),
+                            Icons.Default.MoreVert,
+                            contentDescription = stringResource(R.string.action_more),
                         )
                     }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(
-                            Icons.Default.Settings,
-                            contentDescription = stringResource(R.string.action_settings),
+                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    stringResource(
+                                        if (settings.hideRead) R.string.action_show_read else R.string.action_hide_read,
+                                    ),
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    painter = painterResource(
+                                        if (settings.hideRead) R.drawable.ic_visibility_off else R.drawable.ic_visibility,
+                                    ),
+                                    contentDescription = null,
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                scope.launch { graph.settingsRepository.setHideRead(!settings.hideRead) }
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.saved_title)) },
+                            leadingIcon = {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_bookmark),
+                                    contentDescription = null,
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onOpenSaved()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.action_manage_feeds)) },
+                            leadingIcon = {
+                                Icon(Icons.AutoMirrored.Filled.List, contentDescription = null)
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onOpenFeeds()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.action_settings)) },
+                            leadingIcon = {
+                                Icon(Icons.Default.Settings, contentDescription = null)
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onOpenSettings()
+                            },
                         )
                     }
                 },

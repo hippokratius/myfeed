@@ -18,8 +18,11 @@ android {
         applicationId = "de.hippokratius.kvaesitsorss"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        // Die CI setzt Version automatisch per -PversionCode/-PversionName
+        // (CalVer, siehe .github/workflows/release.yml); die Defaults gelten
+        // nur für lokale Builds.
+        versionCode = (findProperty("versionCode") as String?)?.toInt() ?: 1
+        versionName = (findProperty("versionName") as String?) ?: "1.0.0"
     }
 
     // Fester Debug-Keystore, damit CI-Builds über Installationen hinweg
@@ -39,6 +42,10 @@ android {
         }
         release {
             isMinifyEnabled = false
+            // Gleicher fester Keystore wie debug: Die Release-APK aus der CI
+            // muss über bestehende (debug-signierte) Installationen updatebar
+            // sein – ein anderer Key würde von Android abgelehnt.
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 

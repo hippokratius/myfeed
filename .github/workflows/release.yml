@@ -1,0 +1,79 @@
+name: Release
+
+# Erstellt bei jedem Push auf main (z. B. PR-Merge) automatisch ein
+# GitHub-Release mit installierbarer APK. Versionsschema: CalVer.
+#   versionName = JAHR.MONAT.TAG (Europe/Berlin), z. B. 2026.7.19;
+#                 bei mehreren Releases am selben Tag 2026.7.19.2, .3, …
+#   versionCode = Commit-Anzahl auf main (streng monoton, von Android verlangt)
+# Niemand pflegt Versionsnummern von Hand.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Nie zwei Releases parallel bauen – sonst könnten beide denselben
+# Tages-Suffix berechnen und beim Taggen kollidieren.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Volle Historie: nötig für die Commit-Zählung (versionCode)
+          # und die Tag-Abfrage (Tages-Suffix).
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Compute version
+        id: version
+        run: |
+          set -euo pipefail
+          VERSION_CODE=$(git rev-list --count HEAD)
+          DATE=$(TZ=Europe/Berlin date +%Y.%-m.%-d)
+          # Zwei getrennte Patterns, damit z. B. "v2026.7.1*" nicht
+          # fälschlich v2026.7.19 mitzählt.
+          EXISTING=$(git tag -l "v$DATE" "v$DATE.*" | wc -l)
+          if [ "$EXISTING" -eq 0 ]; then
+            VERSION_NAME="$DATE"
+          else
+            VERSION_NAME="$DATE.$((EXISTING + 1))"
+          fi
+          echo "code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION_NAME (versionCode $VERSION_CODE)"
+
+      - name: Run unit tests
+        run: ./gradlew --no-daemon test
+
+      - name: Build release APK
+        run: >
+          ./gradlew --no-daemon :app:assembleRelease
+          -PversionCode=${{ steps.version.outputs.code }}
+          -PversionName=${{ steps.version.outputs.name }}
+
+      - name: Rename APK
+        run: >
+          mv app/build/outputs/apk/release/app-release.apk
+          "MyFeed-${{ steps.version.outputs.name }}.apk"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.name }}
+          name: v${{ steps.version.outputs.name }}
+          generate_release_notes: true
+          files: MyFeed-${{ steps.version.outputs.name }}.apk
