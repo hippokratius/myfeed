@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.net.Uri
 import android.os.Build
 import android.text.format.DateFormat
 import android.text.format.DateUtils
@@ -78,7 +77,13 @@ class RssWidget : GlanceAppWidget() {
         // Pro Widget-Instanz konfigurierte Kategorie; fehlt der Key, zeigt das Widget alles.
         val category = getAppWidgetState(context, PreferencesGlanceStateDefinition, id)[KEY_CATEGORY]
         val settings = app.graph.settingsRepository.current()
-        val data = WidgetEntries.buildData(app.graph.articleDao, app.graph.feedDao, category, settings.filterWords)
+        val data = WidgetEntries.buildData(
+            app.graph.articleDao,
+            app.graph.feedDao,
+            category,
+            settings.filterWords,
+            minPublishedAt = settings.feedCutoffMillis(System.currentTimeMillis()),
+        )
         val bitmaps = if (settings.showImages) {
             loadBitmaps(data)
         } else {
@@ -263,11 +268,12 @@ private fun LargeArticle(
     image: Bitmap?,
     feedIcons: Map<Long, Bitmap>,
 ) {
+    val context = LocalContext.current
     Column(
         modifier = GlanceModifier
             .fillMaxWidth()
             .padding(vertical = 12.dp)
-            .clickable(openArticleAction(article.link)),
+            .clickable(openArticleAction(context, article)),
     ) {
         if (image != null) {
             var imageModifier = GlanceModifier.fillMaxWidth().height(160.dp)
@@ -335,6 +341,7 @@ private fun RelatedCard(
     thumb: Bitmap?,
     feedIcons: Map<Long, Bitmap>,
 ) {
+    val context = LocalContext.current
     var card = GlanceModifier
         .fillMaxWidth()
         .background(GlanceTheme.colors.surfaceVariant)
@@ -342,7 +349,7 @@ private fun RelatedCard(
         card = card.cornerRadius(12.dp)
     }
     Row(
-        modifier = card.padding(12.dp).clickable(openArticleAction(article.link)),
+        modifier = card.padding(12.dp).clickable(openArticleAction(context, article)),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = GlanceModifier.defaultWeight()) {
@@ -430,8 +437,12 @@ private fun EntryDivider() {
     )
 }
 
-private fun openArticleAction(link: String) =
-    actionStartActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
+/**
+ * Artikel-Taps laufen über die Trampolin-Activity, die den Artikel als
+ * archiviert markiert und dann den Browser öffnet.
+ */
+private fun openArticleAction(context: Context, article: ArticleEntity) =
+    actionStartActivity(OpenArticleActivity.intent(context, article.id, article.link))
 
 private fun openAppAction(context: Context) =
     actionStartActivity(Intent(context, MainActivity::class.java))

@@ -13,6 +13,7 @@ import de.hippokratius.myfeed.data.ArticleDao
 import de.hippokratius.myfeed.data.ArticleEntity
 import de.hippokratius.myfeed.data.FeedDao
 import de.hippokratius.myfeed.data.FeedEntity
+import de.hippokratius.myfeed.settings.AppSettings
 import de.hippokratius.myfeed.settings.SettingsRepository
 import de.hippokratius.myfeed.widget.RssWidget
 import java.io.ByteArrayInputStream
@@ -151,7 +152,10 @@ class FeedSyncer(
                     .onFailure { Log.w(TAG, "Feed ${feed.url} konnte nicht geladen werden", it) }
             }
 
-            articleDao.deleteOlderThan(now - TimeUnit.DAYS.toMillis(settings.maxAgeDays.toLong()))
+            // Archivierte und gemerkte Artikel überleben die normale Aufbewahrung
+            // und werden erst nach der verlängerten Frist entfernt.
+            articleDao.deleteOlderThan(settings.feedCutoffMillis(now))
+            articleDao.deleteSavedOlderThan(settings.savedCutoffMillis(now))
             articleDao.enforceMaxCount(MAX_TOTAL_ARTICLES)
 
             if (settings.showImages) {
@@ -162,7 +166,7 @@ class FeedSyncer(
                 validFeedIds = feedDao.getAll().map { it.id }.toSet(),
             )
 
-            regroup(settings.groupingEnabled)
+            regroup(settings)
             settingsRepository.setLastSyncMillis(System.currentTimeMillis())
             RssWidget.updateAll(context)
         }
@@ -171,7 +175,7 @@ class FeedSyncer(
     /** Gruppierung neu berechnen (auch ohne Netz-Sync, z. B. nach Settings-Änderung). */
     suspend fun regroupAndRefreshWidget() = withContext(Dispatchers.IO) {
         syncMutex.withLock {
-            regroup(settingsRepository.current().groupingEnabled)
+            regroup(settingsRepository.current())
             RssWidget.updateAll(context)
         }
     }
@@ -235,11 +239,14 @@ class FeedSyncer(
         }
     }
 
-    private suspend fun regroup(enabled: Boolean) {
+    private suspend fun regroup(settings: AppSettings) {
         articleDao.clearGroups()
-        if (!enabled) return
+        if (!settings.groupingEnabled) return
 
-        val candidates = articleDao.newest(GROUPING_ARTICLE_LIMIT).map {
+        // Nur Artikel innerhalb der normalen Aufbewahrung gruppieren – alte
+        // Archiv-/Lesezeichen-Artikel tauchen im Feed nicht mehr auf.
+        val cutoff = settings.feedCutoffMillis(System.currentTimeMillis())
+        val candidates = articleDao.newest(GROUPING_ARTICLE_LIMIT, cutoff).map {
             ClusterCandidate(it.id, it.title, it.publishedAt, sourceKey = it.feedId.toString())
         }
         for (group in clusterer.cluster(candidates)) {

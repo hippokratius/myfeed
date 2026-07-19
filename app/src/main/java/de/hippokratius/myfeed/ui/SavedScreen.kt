@@ -20,15 +20,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -37,57 +40,87 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import de.hippokratius.myfeed.AppGraph
 import de.hippokratius.myfeed.R
-import de.hippokratius.myfeed.core.filter.WordFilter
 import de.hippokratius.myfeed.data.ArticleEntity
-import de.hippokratius.myfeed.settings.AppSettings
 import java.io.File
-import java.net.URLDecoder
 
+/**
+ * Extralisten für gemerkte und geöffnete Artikel: Der Lesezeichen-Tab zeigt
+ * alle mit Lesezeichen versehenen Artikel, der Archiv-Tab alle jemals
+ * geöffneten. Beide überleben die normale Aufbewahrungsdauer des Feeds
+ * (einstellbar in den Einstellungen).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GroupScreen(
+fun SavedScreen(
     graph: AppGraph,
-    groupId: String,
     onBack: () -> Unit,
 ) {
-    val decodedGroupId = runCatching { URLDecoder.decode(groupId, "UTF-8") }.getOrDefault(groupId)
-    val allArticles by graph.articleDao.observeGroup(decodedGroupId).collectAsState(initial = emptyList())
-    val settings by graph.settingsRepository.settings.collectAsState(initial = AppSettings())
-    val articles = remember(allArticles, settings.filterWords) {
-        val filter = WordFilter(settings.filterWords)
-        if (filter.isEmpty) allArticles else allArticles.filterNot { filter.matches(it.title) }
-    }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    val bookmarked by graph.articleDao.observeBookmarked().collectAsState(initial = emptyList())
+    val archived by graph.articleDao.observeArchived().collectAsState(initial = emptyList())
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.group_title)) },
+                title = { Text(stringResource(R.string.saved_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back),
+                        )
                     }
                 },
             )
         },
     ) { padding ->
-        LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
-            items(articles, key = { it.id }) { article ->
-                ArticleRow(article, graph)
-                HorizontalDivider()
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            TabRow(selectedTabIndex = selectedTab) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    text = { Text(stringResource(R.string.tab_bookmarks)) },
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    text = { Text(stringResource(R.string.tab_archive)) },
+                )
+            }
+            val articles = if (selectedTab == 0) bookmarked else archived
+            if (articles.isEmpty()) {
+                Text(
+                    text = stringResource(
+                        if (selectedTab == 0) {
+                            R.string.saved_empty_bookmarks
+                        } else {
+                            R.string.saved_empty_archive
+                        },
+                    ),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(24.dp),
+                )
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    items(articles, key = { it.id }) { article ->
+                        SavedArticleRow(article, graph)
+                        HorizontalDivider()
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ArticleRow(article: ArticleEntity, graph: AppGraph) {
+private fun SavedArticleRow(article: ArticleEntity, graph: AppGraph) {
     val context = LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { openArticleAndArchive(context, graph, article) }
-            .padding(16.dp)
-            .alpha(if (article.isRead) 0.45f else 1f),
+            .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {

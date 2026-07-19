@@ -77,6 +77,19 @@
     <string name="widget_no_articles_in_category">Keine Artikel in dieser Kategorie</string>
 
     <string name="reader_title">Dein Feed</string>
+    <string name="action_hide_read">Gelesene Artikel ausblenden</string>
+    <string name="action_show_read">Gelesene Artikel anzeigen</string>
+    <string name="action_bookmark_add">Lesezeichen setzen</string>
+    <string name="action_bookmark_remove">Lesezeichen entfernen</string>
+
+    <string name="saved_title">Gespeichert</string>
+    <string name="tab_bookmarks">Lesezeichen</string>
+    <string name="tab_archive">Archiv</string>
+    <string name="saved_empty_bookmarks">Noch keine Lesezeichen – tippe bei einem Artikel auf das Lesezeichen-Symbol, um ihn hier zu speichern.</string>
+    <string name="saved_empty_archive">Noch keine geöffneten Artikel – jeder Artikel, den du öffnest, landet automatisch hier im Archiv.</string>
+
+    <string name="settings_saved_max_age">Archiv &amp; Lesezeichen aufbewahren</string>
+    <string name="settings_saved_max_age_hint">Geöffnete und mit Lesezeichen versehene Artikel bleiben so lange erhalten – unabhängig von der normalen Aufbewahrungsdauer.</string>
     <string name="action_scroll_to_top">Zum Anfang springen</string>
     <string name="action_manage_feeds">Feeds verwalten</string>
     <string name="shortcut_feeds_short">Feeds</string>

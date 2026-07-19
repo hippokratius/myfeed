@@ -29,6 +29,12 @@ sealed interface WidgetEntry {
     }
 }
 
+/** Alle in diesem Eintrag gezeigten Artikel (Gruppe: Hauptartikel + sichtbare verwandte). */
+fun WidgetEntry.articles(): List<ArticleEntity> = when (this) {
+    is WidgetEntry.Single -> listOf(article)
+    is WidgetEntry.Group -> listOf(main) + related
+}
+
 /** Daten für ein Widget-Rendering: Einträge plus Favicon-Pfade je Feed. */
 data class WidgetData(
     val entries: List<WidgetEntry>,
@@ -38,6 +44,7 @@ data class WidgetData(
 
 object WidgetEntries {
 
+    /** Nur fürs Widget: RemoteViews vertragen keine beliebig langen Listen. */
     const val MAX_ENTRIES = 40
     const val MAX_RELATED_SHOWN = 3
     const val SOURCE_LIMIT = 150
@@ -47,11 +54,12 @@ object WidgetEntries {
         feedDao: FeedDao,
         category: String? = null,
         filterWords: Collection<String> = emptySet(),
+        minPublishedAt: Long = 0,
     ): WidgetData {
         val icons = feedDao.getAll()
             .mapNotNull { feed -> feed.iconPath?.let { feed.id to it } }
             .toMap()
-        return WidgetData(build(articleDao, category, filterWords), icons)
+        return WidgetData(build(articleDao, category, filterWords, minPublishedAt), icons)
     }
 
     /**
@@ -62,11 +70,12 @@ object WidgetEntries {
         articleDao: ArticleDao,
         category: String? = null,
         filterWords: Collection<String> = emptySet(),
+        minPublishedAt: Long = 0,
     ): List<WidgetEntry> {
         val articles = if (category == null) {
-            articleDao.newest(limit = SOURCE_LIMIT)
+            articleDao.newest(limit = SOURCE_LIMIT, minPublishedAt = minPublishedAt)
         } else {
-            articleDao.newestInCategory(category, limit = SOURCE_LIMIT)
+            articleDao.newestInCategory(category, limit = SOURCE_LIMIT, minPublishedAt = minPublishedAt)
         }
         return fromArticles(articles, filterWords = filterWords)
     }
@@ -82,6 +91,8 @@ object WidgetEntries {
         articles: List<ArticleEntity>,
         maxRelated: Int = MAX_RELATED_SHOWN,
         filterWords: Collection<String> = emptySet(),
+        /** Der Reader zeigt alle Artikel, das Widget kappt bei [MAX_ENTRIES]. */
+        maxEntries: Int = MAX_ENTRIES,
     ): List<WidgetEntry> {
         val filter = WordFilter(filterWords)
         val visible = if (filter.isEmpty) articles else articles.filterNot { filter.matches(it.title) }
@@ -106,6 +117,6 @@ object WidgetEntries {
 
         visible.filter { it.groupId == null }.forEach { entries += WidgetEntry.Single(it) }
 
-        return entries.sortedByDescending { it.sortKey }.take(MAX_ENTRIES)
+        return entries.sortedByDescending { it.sortKey }.take(maxEntries)
     }
 }

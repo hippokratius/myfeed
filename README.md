@@ -24,6 +24,16 @@ vermutlich über dasselbe Thema berichten, werden zu einer Karte gruppiert.
   (Horizontal scrollbare Listen sind in App-Widgets technisch nicht möglich,
   daher die vertikale Kompakt-Darstellung.)
 - **Tap = Browser**: Jeder Artikel öffnet direkt im Browser
+- **Gelesen-Status**: Der Reader zeigt alle Artikel (kein 40er-Limit mehr);
+  Artikel, über die von oben nach unten hinweggescrollt wurde, gelten als
+  gelesen, werden ausgegraut dargestellt und lassen sich per Augen-Symbol
+  in der Titelzeile ausblenden
+- **Archiv**: Geöffnete (angetippte) Artikel – auch aus dem Widget – werden
+  automatisch archiviert und bleiben über die normale Aufbewahrungsdauer
+  hinaus in der Archiv-Liste auffindbar
+- **Lesezeichen**: Artikel lassen sich per Lesezeichen-Symbol in eine
+  Extraliste speichern; die Aufbewahrungsdauer für Archiv und Lesezeichen
+  ist länger als die des Feeds und in den Einstellungen wählbar
 - **Feeds entdecken**: kuratierter Katalog bekannter deutsch- und
   englischsprachiger Feeds (Tagesschau, heise, BBC, …), nach Kategorien
   gruppiert, mit Ein-Tipp-Hinzufügen
@@ -37,8 +47,8 @@ vermutlich über dasselbe Thema berichten, werden zu einer Karte gruppiert.
   Long-Press → Neu konfigurieren)
 - **App-Shortcut „Feeds verwalten"**: per Long-Press auf das App-Icon direkt
   in die Feed-Verwaltung springen
-- **Einstellungen**: Aktualisierungsintervall (15–180 min), Aufbewahrungsdauer,
-  Bilder an/aus, Gruppierung an/aus
+- **Einstellungen**: Aktualisierungsintervall (15–180 min), Aufbewahrungsdauer
+  (Feed sowie separat Archiv & Lesezeichen), Bilder an/aus, Gruppierung an/aus
 - Unterstützt RSS 2.0, RSS 1.0 (RDF) und Atom; hell/dunkel folgt dem System
 
 ## Widget einrichten

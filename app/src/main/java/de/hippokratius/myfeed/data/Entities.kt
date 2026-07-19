@@ -31,6 +31,8 @@ data class FeedEntity(
         Index(value = ["feedId", "guid"], unique = true),
         Index(value = ["publishedAt"]),
         Index(value = ["groupId"]),
+        Index(value = ["archivedAt"]),
+        Index(value = ["bookmarkedAt"]),
     ],
     foreignKeys = [
         ForeignKey(
@@ -56,4 +58,13 @@ data class ArticleEntity(
     val fetchedAt: Long,
     /** Themen-Gruppe (null = Einzelartikel). Wird bei jedem Sync neu berechnet. */
     val groupId: String?,
-)
+    /** Wann der Artikel im Reader vorbeigescrollt wurde (null = ungelesen). */
+    val readAt: Long? = null,
+    /** Wann der Artikel geöffnet wurde – geöffnete Artikel landen im Archiv (null = nie). */
+    val archivedAt: Long? = null,
+    /** Wann das Lesezeichen gesetzt wurde (null = kein Lesezeichen). */
+    val bookmarkedAt: Long? = null,
+) {
+    val isRead: Boolean get() = readAt != null
+    val isBookmarked: Boolean get() = bookmarkedAt != null
+}
