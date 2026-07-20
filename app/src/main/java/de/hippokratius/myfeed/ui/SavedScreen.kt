@@ -28,6 +28,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -38,6 +40,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
 import de.hippokratius.myfeed.AppGraph
 import de.hippokratius.myfeed.R
 import de.hippokratius.myfeed.data.ArticleEntity
@@ -143,9 +146,12 @@ private fun SavedArticleRow(article: ArticleEntity, graph: AppGraph, showImages:
         }
         // Lokales Thumb zuerst, sonst lädt Coil das Remote-Bild lazy (gecacht).
         val thumbModel: Any? = article.thumbPath?.let(::File) ?: article.imageUrl
-        if (showImages && thumbModel != null) {
+        // Bei Ladefehlern (z. B. 403 vom Server) einklappen statt leerer Fläche.
+        var thumbFailed by remember(thumbModel) { mutableStateOf(false) }
+        if (showImages && thumbModel != null && !thumbFailed) {
             AsyncImage(
                 model = thumbModel,
+                onState = { if (it is AsyncImagePainter.State.Error) thumbFailed = true },
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier

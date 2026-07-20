@@ -68,6 +68,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
 import de.hippokratius.myfeed.AppGraph
 import de.hippokratius.myfeed.R
 import de.hippokratius.myfeed.data.ArticleEntity
@@ -450,9 +451,13 @@ private fun LargeArticleItem(
         // Lokales, kleines Thumbnail bevorzugen; das Remote-Bild lädt Coil nur
         // als Fallback – lazy beim Scrollen und mit Memory-/Disk-Cache.
         val imageModel: Any? = article.thumbPath?.let(::File) ?: article.imageUrl
-        if (showImages && imageModel != null) {
+        // Bei Ladefehlern (z. B. 403 vom Server) die reservierte Fläche einklappen,
+        // statt eine leere Lücke zu zeigen.
+        var imageFailed by remember(imageModel) { mutableStateOf(false) }
+        if (showImages && imageModel != null && !imageFailed) {
             AsyncImage(
                 model = imageModel,
+                onState = { if (it is AsyncImagePainter.State.Error) imageFailed = true },
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -553,10 +558,13 @@ private fun RelatedCard(
                     )
                 }
                 val thumbModel: Any? = article.thumbPath?.let(::File) ?: article.imageUrl
-                if (showImages && thumbModel != null) {
+                // Fehlgeschlagene Bilder einklappen statt leerer Fläche.
+                var thumbFailed by remember(thumbModel) { mutableStateOf(false) }
+                if (showImages && thumbModel != null && !thumbFailed) {
                     Spacer(modifier = Modifier.width(10.dp))
                     AsyncImage(
                         model = thumbModel,
+                        onState = { if (it is AsyncImagePainter.State.Error) thumbFailed = true },
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
