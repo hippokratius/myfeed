@@ -33,9 +33,17 @@ object FeedLinkFinder {
         "application/rdf+xml",
     )
 
+    /** Generische XML-Typen, mit denen manche Seiten ihre Feeds deklarieren. */
+    private val GENERIC_XML_TYPES = setOf(
+        "application/xml",
+        "text/xml",
+    )
+
     /** Gängige Feed-Pfade als Fallback für Seiten ohne <link>-Deklaration. */
     private val COMMON_PATHS = listOf(
         "/feed", "/feed.xml", "/rss", "/rss.xml", "/atom.xml", "/index.xml",
+        "/feeds/posts/default", // Blogger
+        "/?feed=rss2", // WordPress ohne Permalink-Struktur
     )
 
     private const val MAX_CANDIDATES = 10
@@ -86,9 +94,12 @@ object FeedLinkFinder {
 
     private fun isFeedLink(attributes: Map<String, String>): Boolean {
         val relTokens = attributes["rel"].orEmpty().lowercase().split(WHITESPACE_REGEX)
-        if ("alternate" !in relTokens) return false
+        if ("alternate" !in relTokens && "feed" !in relTokens) return false
         val type = attributes["type"].orEmpty().substringBefore(';').trim().lowercase()
-        return type in FEED_TYPES
+        if (type in FEED_TYPES || type in GENERIC_XML_TYPES) return true
+        // rel="feed" (WHATWG) darf ohne type auskommen; falsche Kandidaten scheitern
+        // später ohnehin an der Verifikation durch echtes Laden und Parsen.
+        return "feed" in relTokens && type.isEmpty()
     }
 
     private fun parseAttributes(tag: String): Map<String, String> {
