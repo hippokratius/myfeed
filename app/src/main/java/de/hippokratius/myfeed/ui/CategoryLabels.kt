@@ -16,4 +16,5 @@ fun CatalogCategory.labelRes(): Int = when (this) {
     CatalogCategory.SCIENCE -> R.string.category_science
     CatalogCategory.ECONOMY -> R.string.category_economy
     CatalogCategory.CULTURE -> R.string.category_culture
+    CatalogCategory.SATIRE -> R.string.category_satire
 }

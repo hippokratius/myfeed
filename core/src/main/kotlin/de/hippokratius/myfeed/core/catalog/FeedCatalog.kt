@@ -11,6 +11,7 @@ enum class CatalogCategory {
     SCIENCE,
     ECONOMY,
     CULTURE,
+    SATIRE,
 }
 
 /** Ein kuratierter Feed-Vorschlag. */
@@ -119,6 +120,7 @@ object FeedCatalog {
         CatalogFeed("NASA Breaking News", "https://www.nasa.gov/rss/dyn/breaking_news.rss", CatalogCategory.SCIENCE, "en"),
         CatalogFeed("Live Science", "https://www.livescience.com/feeds/all", CatalogCategory.SCIENCE, "en"),
         CatalogFeed("The Guardian Environment", "https://www.theguardian.com/environment/rss", CatalogCategory.SCIENCE, "en"),
+        CatalogFeed("Utopia", "https://utopia.de/feed/", CatalogCategory.SCIENCE, "de"),
 
         // Wirtschaft
         CatalogFeed("Handelsblatt", "https://www.handelsblatt.com/contentexport/feed/schlagzeilen", CatalogCategory.ECONOMY, "de"),
@@ -136,6 +138,13 @@ object FeedCatalog {
         CatalogFeed("Pitchfork", "https://pitchfork.com/rss/news/", CatalogCategory.CULTURE, "en"),
         CatalogFeed("Rolling Stone", "https://www.rollingstone.com/feed/", CatalogCategory.CULTURE, "en"),
         CatalogFeed("Open Culture", "https://www.openculture.com/feed", CatalogCategory.CULTURE, "en"),
+
+        // Satire & Humor
+        CatalogFeed("Der Postillon", "https://www.der-postillon.com/feeds/posts/default", CatalogCategory.SATIRE, "de"),
+        CatalogFeed("Twitterperlen", "https://twitterperlen.de/feed/", CatalogCategory.SATIRE, "de"),
+        CatalogFeed("Faktillion", "https://faktillion.de/feed/", CatalogCategory.SATIRE, "de"),
+        CatalogFeed("Titanic", "https://www.titanic-magazin.de/rss.xml", CatalogCategory.SATIRE, "de"),
+        CatalogFeed("The Onion", "https://theonion.com/feed/", CatalogCategory.SATIRE, "en"),
     )
 
     /** Katalog gruppiert nach Kategorie, in Enum-Reihenfolge. */
