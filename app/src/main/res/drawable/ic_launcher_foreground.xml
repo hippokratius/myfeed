@@ -4,18 +4,18 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Klassisches RSS-Symbol, zentriert im Safe-Zone-Bereich -->
-    <group
-        android:translateX="30"
-        android:translateY="30">
-        <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M6.18,37.82m-6.18,0a6.18,6.18 0,1 1,12.36 0a6.18,6.18 0,1 1,-12.36 0" />
-        <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M0,15.06c8.16,0 15.84,3.19 21.62,8.97C27.4,29.81 30.58,37.5 30.58,45.66h8.98c0,-21.84 -17.72,-39.58 -39.56,-39.58v8.98z" />
-        <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M0,0v8.98c20.21,0 36.66,16.47 36.66,36.68h8.98C45.64,20.47 25.17,0 0,0z" />
-    </group>
+    <!-- Feed-Symbol mit runden Strichenden, optisch im Safe-Zone-Bereich zentriert -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M40.75,67.25m-6,0a6,6 0 1,1 12,0a6,6 0 1,1 -12,0" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="9"
+        android:strokeLineCap="round"
+        android:pathData="M40.75,51.75A15.5,15.5 0 0 1 56.25,67.25" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="9"
+        android:strokeLineCap="round"
+        android:pathData="M40.75,39.25A28,28 0 0 1 68.75,67.25" />
 </vector>
