@@ -1,15 +1,17 @@
 name: Release
 
-# Erstellt bei jedem Push auf main (z. B. PR-Merge) automatisch ein
-# GitHub-Release mit installierbarer APK. Versionsschema: CalVer.
+# Erstellt einmal pro Woche (Sonntagmorgen) automatisch ein GitHub-Release
+# mit installierbarer APK – aber nur, wenn es seit dem letzten Release neue
+# Commits auf main gab. Versionsschema: CalVer.
 #   versionName = JAHR.MONAT.TAG (Europe/Berlin), z. B. 2026.7.19;
 #                 bei mehreren Releases am selben Tag 2026.7.19.2, .3, …
 #   versionCode = Commit-Anzahl auf main (streng monoton, von Android verlangt)
 # Niemand pflegt Versionsnummern von Hand.
 
 on:
-  push:
-    branches: [main]
+  schedule:
+    # Sonntags 06:00 MESZ / 07:00 MEZ (Cron läuft in UTC).
+    - cron: "0 5 * * 0"
   workflow_dispatch:
 
 permissions:
@@ -22,7 +24,40 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Prüft, ob es seit dem letzten Release-Tag neue Commits gibt.
+  # Ohne Änderungen wird der geplante Lauf übersprungen; ein manueller
+  # Start (workflow_dispatch) baut immer.
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for changes since last release
+        id: diff
+        run: |
+          set -euo pipefail
+          LAST_TAG=$(git describe --tags --match 'v*' --abbrev=0 2>/dev/null || true)
+          if [ -z "$LAST_TAG" ]; then
+            echo "Kein bisheriges Release-Tag gefunden – Release wird gebaut."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          NEW_COMMITS=$(git rev-list --count "$LAST_TAG..HEAD")
+          echo "Letztes Release: $LAST_TAG, neue Commits seitdem: $NEW_COMMITS"
+          if [ "$NEW_COMMITS" -gt 0 ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
   release:
+    needs: check
+    if: needs.check.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
