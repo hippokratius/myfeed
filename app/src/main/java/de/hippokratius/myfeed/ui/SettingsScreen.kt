@@ -1,6 +1,7 @@
 package de.hippokratius.myfeed.ui
 
-import androidx.compose.foundation.clickable
+import androidx.annotation.StringRes
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,14 +21,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -42,6 +44,8 @@ import de.hippokratius.myfeed.AppGraph
 import de.hippokratius.myfeed.R
 import de.hippokratius.myfeed.settings.AppSettings
 import de.hippokratius.myfeed.widget.RssWidget
+import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 private val REFRESH_INTERVALS = listOf(15, 30, 60, 180)
@@ -80,28 +84,26 @@ fun SettingsScreen(
                 .padding(16.dp),
         ) {
             SectionTitle(stringResource(R.string.settings_refresh_interval))
-            REFRESH_INTERVALS.forEach { minutes ->
-                RadioRow(
-                    label = stringResource(R.string.settings_minutes, minutes),
-                    selected = settings.refreshIntervalMinutes == minutes,
-                    onClick = {
-                        scope.launch { graph.settingsRepository.setRefreshIntervalMinutes(minutes) }
-                    },
-                )
-            }
+            SteppedSliderRow(
+                values = REFRESH_INTERVALS,
+                selectedValue = settings.refreshIntervalMinutes,
+                labelRes = R.string.settings_minutes,
+                onValueSelected = { minutes ->
+                    scope.launch { graph.settingsRepository.setRefreshIntervalMinutes(minutes) }
+                },
+            )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
             SectionTitle(stringResource(R.string.settings_max_age))
-            MAX_AGES.forEach { days ->
-                RadioRow(
-                    label = stringResource(R.string.settings_days, days),
-                    selected = settings.maxAgeDays == days,
-                    onClick = {
-                        scope.launch { graph.settingsRepository.setMaxAgeDays(days) }
-                    },
-                )
-            }
+            SteppedSliderRow(
+                values = MAX_AGES,
+                selectedValue = settings.maxAgeDays,
+                labelRes = R.string.settings_days,
+                onValueSelected = { days ->
+                    scope.launch { graph.settingsRepository.setMaxAgeDays(days) }
+                },
+            )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
@@ -112,15 +114,14 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
-            SAVED_MAX_AGES.forEach { days ->
-                RadioRow(
-                    label = stringResource(R.string.settings_days, days),
-                    selected = settings.archiveMaxAgeDays == days,
-                    onClick = {
-                        scope.launch { graph.settingsRepository.setArchiveMaxAgeDays(days) }
-                    },
-                )
-            }
+            SteppedSliderRow(
+                values = SAVED_MAX_AGES,
+                selectedValue = settings.archiveMaxAgeDays,
+                labelRes = R.string.settings_days,
+                onValueSelected = { days ->
+                    scope.launch { graph.settingsRepository.setArchiveMaxAgeDays(days) }
+                },
+            )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
@@ -131,15 +132,14 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
-            SAVED_MAX_AGES.forEach { days ->
-                RadioRow(
-                    label = stringResource(R.string.settings_days, days),
-                    selected = settings.bookmarkMaxAgeDays == days,
-                    onClick = {
-                        scope.launch { graph.settingsRepository.setBookmarkMaxAgeDays(days) }
-                    },
-                )
-            }
+            SteppedSliderRow(
+                values = SAVED_MAX_AGES,
+                selectedValue = settings.bookmarkMaxAgeDays,
+                labelRes = R.string.settings_days,
+                onValueSelected = { days ->
+                    scope.launch { graph.settingsRepository.setBookmarkMaxAgeDays(days) }
+                },
+            )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
@@ -231,14 +231,44 @@ private fun SectionTitle(text: String) {
     )
 }
 
+/** Slider, der nur auf den Positionen aus [values] einrastet; Marker werden beschriftet. */
 @Composable
-private fun RadioRow(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun SteppedSliderRow(
+    values: List<Int>,
+    selectedValue: Int,
+    @StringRes labelRes: Int,
+    onValueSelected: (Int) -> Unit,
+) {
+    val selectedIndex = values.indexOf(selectedValue).takeIf { it >= 0 }
+        ?: values.indices.minBy { abs(values[it] - selectedValue) }
+    var sliderIndex by remember(selectedIndex) { mutableFloatStateOf(selectedIndex.toFloat()) }
+    val currentValue = values[sliderIndex.roundToInt().coerceIn(values.indices)]
+
+    Text(
+        text = stringResource(labelRes, currentValue),
+        style = MaterialTheme.typography.bodyLarge,
+    )
+    Slider(
+        value = sliderIndex,
+        onValueChange = { sliderIndex = it },
+        valueRange = 0f..(values.size - 1).toFloat(),
+        steps = values.size - 2,
+        onValueChangeFinished = {
+            val value = values[sliderIndex.roundToInt().coerceIn(values.indices)]
+            if (value != selectedValue) onValueSelected(value)
+        },
+    )
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        RadioButton(selected = selected, onClick = onClick)
-        Text(label, style = MaterialTheme.typography.bodyLarge)
+        values.forEach { value ->
+            Text(
+                text = value.toString(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
