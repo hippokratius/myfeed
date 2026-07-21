@@ -209,11 +209,12 @@ class FeedLinkFinderTest {
     }
 
     @Test
-    fun `common feed paths derive from site root of a deep url`() {
+    fun `common feed paths derive from site root of a deep url and both host variants`() {
         val paths = FeedLinkFinder.commonFeedPaths("https://www.zdf.de/nachrichten/politik?x=1")
 
         assertEquals(
             listOf(
+                // Zuerst der eingegebene Host …
                 "https://www.zdf.de/feed",
                 "https://www.zdf.de/feed.xml",
                 "https://www.zdf.de/rss",
@@ -222,6 +223,15 @@ class FeedLinkFinderTest {
                 "https://www.zdf.de/index.xml",
                 "https://www.zdf.de/feeds/posts/default",
                 "https://www.zdf.de/?feed=rss2",
+                // … dann die nackte Variante.
+                "https://zdf.de/feed",
+                "https://zdf.de/feed.xml",
+                "https://zdf.de/rss",
+                "https://zdf.de/rss.xml",
+                "https://zdf.de/atom.xml",
+                "https://zdf.de/index.xml",
+                "https://zdf.de/feeds/posts/default",
+                "https://zdf.de/?feed=rss2",
             ),
             paths,
         )
@@ -234,5 +244,41 @@ class FeedLinkFinderTest {
             FeedLinkFinder.commonFeedPaths("http://example.org:8080/blog").first(),
         )
         assertTrue(FeedLinkFinder.commonFeedPaths("kein url ###").isEmpty())
+    }
+
+    @Test
+    fun `host variants add www for a bare apex domain`() {
+        assertEquals(
+            listOf("https://geldfuerdiewelt.de/", "https://www.geldfuerdiewelt.de/"),
+            FeedLinkFinder.hostVariants("https://geldfuerdiewelt.de/"),
+        )
+    }
+
+    @Test
+    fun `host variants strip www and keep path, port and query`() {
+        assertEquals(
+            listOf("https://www.example.org:8443/blog?x=1", "https://example.org:8443/blog?x=1"),
+            FeedLinkFinder.hostVariants("https://www.example.org:8443/blog?x=1"),
+        )
+    }
+
+    @Test
+    fun `host variants leave subdomains and ip addresses untouched`() {
+        assertEquals(
+            listOf("https://blog.example.org/"),
+            FeedLinkFinder.hostVariants("https://blog.example.org/"),
+        )
+        assertEquals(
+            listOf("http://192.168.0.1/feed"),
+            FeedLinkFinder.hostVariants("http://192.168.0.1/feed"),
+        )
+    }
+
+    @Test
+    fun `host variants return input unchanged for garbage`() {
+        assertEquals(
+            listOf("kein url ###"),
+            FeedLinkFinder.hostVariants("kein url ###"),
+        )
     }
 }

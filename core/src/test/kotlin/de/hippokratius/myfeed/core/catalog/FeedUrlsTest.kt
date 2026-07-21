@@ -56,4 +56,25 @@ class FeedUrlsTest {
         assertEquals("example.org", FeedUrls.canonical("  https://www.example.org/  "))
         assertEquals("example.org", FeedUrls.canonical("example.org"))
     }
+
+    @Test
+    fun `request key keeps www so bare and www variant differ`() {
+        assertNotEquals(
+            FeedUrls.requestKey("https://www.geldfuerdiewelt.de/feed"),
+            FeedUrls.requestKey("https://geldfuerdiewelt.de/feed"),
+        )
+        // Gegenprobe: canonical fasst sie weiterhin zusammen.
+        assertEquals(
+            FeedUrls.canonical("https://www.geldfuerdiewelt.de/feed"),
+            FeedUrls.canonical("https://geldfuerdiewelt.de/feed"),
+        )
+    }
+
+    @Test
+    fun `request key still ignores scheme and trailing slash`() {
+        assertEquals(
+            FeedUrls.requestKey("http://www.example.org/feed/"),
+            FeedUrls.requestKey("https://www.example.org/feed"),
+        )
+    }
 }

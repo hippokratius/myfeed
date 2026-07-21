@@ -83,13 +83,52 @@ object FeedLinkFinder {
         return null
     }
 
-    /** Typische Feed-Pfade an der Site-Root von [pageUrl] (Fallback ohne <link>-Tags). */
-    fun commonFeedPaths(pageUrl: String): List<String> {
+    /**
+     * Typische Feed-Pfade an der Site-Root von [pageUrl] (Fallback ohne <link>-Tags).
+     * Wird über beide Host-Varianten (mit und ohne "www.", s. [hostVariants]) gespannt,
+     * damit z. B. bei Eingabe von `example.org` auch `www.example.org/feed` geprüft wird.
+     */
+    fun commonFeedPaths(pageUrl: String): List<String> =
+        hostVariants(pageUrl).flatMap { rootFeedPaths(it) }
+
+    private fun rootFeedPaths(pageUrl: String): List<String> {
         val uri = runCatching { URI(pageUrl.trim()) }.getOrNull() ?: return emptyList()
         val host = uri.host ?: return emptyList()
         val scheme = uri.scheme ?: "https"
         val port = if (uri.port == -1) "" else ":${uri.port}"
         return COMMON_PATHS.map { "$scheme://$host$port$it" }
+    }
+
+    /**
+     * Gibt [pageUrl] zurück, plus – falls sinnvoll – dieselbe URL mit umgeschaltetem
+     * "www."-Präfix. So findet die Feed-Suche den Feed auch, wenn der Nutzer das heute
+     * meist weggelassene "www." nicht mit eingibt (und umgekehrt).
+     *
+     * - Host beginnt mit "www." → zusätzlich die nackte Domain.
+     * - Apex-Domain (genau ein Punkt, z. B. `example.org`) → zusätzlich `www.` davor.
+     * - Subdomains (`blog.example.org`) und IP-Adressen bleiben unverändert, damit
+     *   kein Unsinn wie `www.blog.example.org` entsteht.
+     */
+    fun hostVariants(pageUrl: String): List<String> {
+        val original = pageUrl.trim()
+        val uri = runCatching { URI(original) }.getOrNull() ?: return listOf(pageUrl)
+        val host = uri.host ?: return listOf(pageUrl)
+        val variantHost = wwwVariant(host) ?: return listOf(pageUrl)
+
+        val scheme = uri.scheme ?: "https"
+        val port = if (uri.port == -1) "" else ":${uri.port}"
+        val path = uri.rawPath.orEmpty()
+        val query = uri.rawQuery?.let { "?$it" }.orEmpty()
+        return listOf(original, "$scheme://$variantHost$port$path$query")
+    }
+
+    /** Nacktes ↔ www.-Gegenstück eines Hosts, oder null, wenn keine Variante sinnvoll ist. */
+    private fun wwwVariant(host: String): String? {
+        val normalized = host.lowercase()
+        if (normalized.startsWith("www.")) return normalized.removePrefix("www.")
+        // Nur Apex-Domains (genau ein Punkt) bekommen "www."; das schließt Subdomains
+        // und IPv4-Adressen (drei Punkte) aus.
+        return if (normalized.count { it == '.' } == 1) "www.$normalized" else null
     }
 
     private fun isFeedLink(attributes: Map<String, String>): Boolean {
