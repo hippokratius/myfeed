@@ -51,8 +51,8 @@ import kotlinx.coroutines.launch
 private val REFRESH_INTERVALS = listOf(15, 30, 60, 180)
 private val MAX_AGES = listOf(3, 7, 14)
 
-/** Verlängerte Aufbewahrung für Archiv bzw. Lesezeichen – länger als der Feed. */
-private val SAVED_MAX_AGES = listOf(14, 30, 90, 365)
+/** Aufbewahrung für Archiv bzw. Lesezeichen – nie kürzer als die normale Aufbewahrung wirksam. */
+private val SAVED_MAX_AGES = listOf(7, 14, 30, 60)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
