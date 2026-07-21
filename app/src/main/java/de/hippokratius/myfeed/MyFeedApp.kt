@@ -2,6 +2,8 @@ package de.hippokratius.myfeed
 
 import android.app.Application
 import android.content.Context
+import coil.ImageLoader
+import coil.ImageLoaderFactory
 import de.hippokratius.myfeed.data.AppDatabase
 import de.hippokratius.myfeed.fetch.FeedFetchWorker
 import de.hippokratius.myfeed.fetch.FeedSyncer
@@ -23,7 +25,7 @@ class AppGraph(context: Context) {
     val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 }
 
-class MyFeedApp : Application() {
+class MyFeedApp : Application(), ImageLoaderFactory {
 
     lateinit var graph: AppGraph
         private set
@@ -42,4 +44,24 @@ class MyFeedApp : Application() {
                 }
         }
     }
+
+    /**
+     * App-weiter Coil-Loader: nutzt den OkHttp-Client des Syncers (gemeinsamer
+     * Verbindungs-Pool) und sendet unseren User-Agent – manche Seiten
+     * (z. B. 9to5linux.com) beantworten den OkHttp-Standard-UA mit 403.
+     */
+    override fun newImageLoader(): ImageLoader =
+        ImageLoader.Builder(this)
+            .okHttpClient {
+                graph.feedSyncer.httpClient.newBuilder()
+                    .addInterceptor { chain ->
+                        chain.proceed(
+                            chain.request().newBuilder()
+                                .header("User-Agent", FeedSyncer.USER_AGENT)
+                                .build(),
+                        )
+                    }
+                    .build()
+            }
+            .build()
 }
