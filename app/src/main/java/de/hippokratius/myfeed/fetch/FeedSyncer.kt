@@ -41,6 +41,10 @@ sealed class FeedResolution {
     data object NoFeedsFound : FeedResolution()
 }
 
+/** IOException mit HTTP-Statuscode, um gezielt auf Bot-Blocker (403 & Co.) reagieren zu können. */
+private class HttpStatusException(val code: Int, url: String) :
+    java.io.IOException("HTTP $code für $url")
+
 /**
  * Kern der Aktualisierung: lädt alle aktiven Feeds, aktualisiert die Datenbank,
  * lädt Thumbnails, berechnet die Themen-Gruppen und stößt das Widget-Update an.
@@ -79,21 +83,22 @@ class FeedSyncer(
             if (it.startsWith("http://") || it.startsWith("https://")) it else "https://$it"
         }
 
-        val (bytes, headerCharset, finalUrl) =
-            discoveryClient.newCall(buildRequest(url, ACCEPT_DISCOVERY)).execute().use { response ->
-                if (!response.isSuccessful) {
-                    throw java.io.IOException("HTTP ${response.code} für $url")
+        val (bytes, headerCharset, finalUrl) = runCatching { fetchPage(url) }
+            .recoverCatching { error ->
+                // Manche Seiten blocken unbekannte User-Agents: einmal als Browser nachfassen.
+                if (error is HttpStatusException && error.code in BROWSER_UA_RETRY_CODES) {
+                    fetchPage(url, browserUa = true)
+                } else {
+                    throw error
                 }
-                val body = response.body ?: throw java.io.IOException("Leere Antwort für $url")
-                val source = body.source()
-                if (source.request(MAX_RESPONSE_BYTES + 1L)) {
-                    throw java.io.IOException("Antwort größer als $MAX_RESPONSE_BYTES Bytes für $url")
-                }
-                Triple(
-                    source.buffer.readByteArray(),
-                    body.contentType()?.charset(),
-                    response.request.url.toString(),
-                )
+            }
+            .getOrElse { error ->
+                // Startseite nicht ladbar: gängige Feed-Pfade probieren, bevor der
+                // Fehler an die UI geht (der Feed-Endpunkt ist oft nicht geblockt).
+                val fallback = FeedLinkFinder.commonFeedPaths(url).map { DiscoveredFeed(it) }
+                val verified = verifyCandidates(fallback, mutableSetOf())
+                if (verified.isEmpty()) throw error
+                return@withContext FeedResolution.Discovered(verified)
             }
 
         // Weiche nach Inhalt, nicht nach Content-Type: manche Feeds kommen als text/html.
@@ -218,19 +223,50 @@ class FeedSyncer(
         articleDao.insertAll(articles)
     }
 
-    private fun fetchAndParse(url: String, client: OkHttpClient = httpClient): ParsedFeed {
-        return client.newCall(buildRequest(url, ACCEPT_FEED)).execute().use { response ->
+    /** Lädt die Seite für die Feed-Suche komplett in den Speicher (Bytes, Header-Charset, End-URL). */
+    private fun fetchPage(url: String, browserUa: Boolean = false): Triple<ByteArray, java.nio.charset.Charset?, String> =
+        discoveryClient.newCall(buildRequest(url, ACCEPT_DISCOVERY, browserUa)).execute().use { response ->
             if (!response.isSuccessful) {
-                throw java.io.IOException("HTTP ${response.code} für $url")
+                throw HttpStatusException(response.code, url)
+            }
+            val body = response.body ?: throw java.io.IOException("Leere Antwort für $url")
+            val source = body.source()
+            if (source.request(MAX_RESPONSE_BYTES + 1L)) {
+                throw java.io.IOException("Antwort größer als $MAX_RESPONSE_BYTES Bytes für $url")
+            }
+            Triple(
+                source.buffer.readByteArray(),
+                body.contentType()?.charset(),
+                response.request.url.toString(),
+            )
+        }
+
+    private fun fetchAndParse(url: String, client: OkHttpClient = httpClient): ParsedFeed {
+        return try {
+            fetchAndParseOnce(url, client, browserUa = false)
+        } catch (e: HttpStatusException) {
+            // Bot-Blocker lassen den Feed-Endpunkt oft nur für Browser-Kennungen durch.
+            if (e.code in BROWSER_UA_RETRY_CODES) {
+                fetchAndParseOnce(url, client, browserUa = true)
+            } else {
+                throw e
+            }
+        }
+    }
+
+    private fun fetchAndParseOnce(url: String, client: OkHttpClient, browserUa: Boolean): ParsedFeed {
+        return client.newCall(buildRequest(url, ACCEPT_FEED, browserUa)).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw HttpStatusException(response.code, url)
             }
             val body = response.body ?: throw java.io.IOException("Leere Antwort für $url")
             RssXmlParser.parse(body.byteStream())
         }
     }
 
-    private fun buildRequest(url: String, accept: String): Request = Request.Builder()
+    private fun buildRequest(url: String, accept: String, browserUa: Boolean = false): Request = Request.Builder()
         .url(url)
-        .header("User-Agent", USER_AGENT)
+        .header("User-Agent", if (browserUa) BROWSER_USER_AGENT else USER_AGENT)
         .header("Accept", accept)
         .build()
 
@@ -282,6 +318,11 @@ class FeedSyncer(
     companion object {
         private const val TAG = "FeedSyncer"
         const val USER_AGENT = "MyFeed/1.0 (+https://github.com/hippokratius/kveasitso-rss)"
+
+        /** Zweitversuch als Browser, wenn ein Server die eigene Kennung ablehnt. */
+        private const val BROWSER_USER_AGENT =
+            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+        private val BROWSER_UA_RETRY_CODES = setOf(401, 403, 406)
         private const val ACCEPT_FEED =
             "application/rss+xml, application/atom+xml, application/xml, text/xml, */*"
         private const val ACCEPT_DISCOVERY = "$ACCEPT_FEED, text/html"

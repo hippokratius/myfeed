@@ -60,6 +60,7 @@
     <string name="category_science">Science</string>
     <string name="category_economy">Business</string>
     <string name="category_culture">Culture</string>
+    <string name="category_satire">Satire &amp; Humor</string>
     <string name="category_all">All</string>
     <string name="category_none">Uncategorized</string>
     <string name="category_header_count">%1$s (%2$d)</string>

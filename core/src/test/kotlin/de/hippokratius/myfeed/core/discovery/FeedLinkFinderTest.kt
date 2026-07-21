@@ -91,6 +91,34 @@ class FeedLinkFinderTest {
     }
 
     @Test
+    fun `accepts generic xml types on alternate links`() {
+        val html = """
+            <link rel="alternate" type="application/xml" href="/a.xml">
+            <link rel="alternate" type="text/xml; charset=UTF-8" href="/b.xml">
+        """.trimIndent()
+
+        val feeds = FeedLinkFinder.find(html, "https://example.org/")
+
+        assertEquals(
+            listOf("https://example.org/a.xml", "https://example.org/b.xml"),
+            feeds.map { it.url },
+        )
+    }
+
+    @Test
+    fun `accepts rel feed without type but not with html type`() {
+        val html = """
+            <link rel="feed" href="/updates">
+            <link rel="feed" type="text/html" href="/blog">
+            <link rel="alternate" href="/ohne-type">
+        """.trimIndent()
+
+        val feeds = FeedLinkFinder.find(html, "https://example.org/")
+
+        assertEquals(listOf("https://example.org/updates"), feeds.map { it.url })
+    }
+
+    @Test
     fun `ignores stylesheet icon and text-html alternate links`() {
         val html = """
             <link rel="stylesheet" href="/style.css">
@@ -192,6 +220,8 @@ class FeedLinkFinderTest {
                 "https://www.zdf.de/rss.xml",
                 "https://www.zdf.de/atom.xml",
                 "https://www.zdf.de/index.xml",
+                "https://www.zdf.de/feeds/posts/default",
+                "https://www.zdf.de/?feed=rss2",
             ),
             paths,
         )
