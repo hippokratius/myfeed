@@ -129,7 +129,9 @@ class FeedSyncer(
         candidates: List<DiscoveredFeed>,
         triedUrls: MutableSet<String>,
     ): List<DiscoveredFeed> = coroutineScope {
-        val fresh = candidates.filter { triedUrls.add(FeedUrls.canonical(it.url)) }
+        // requestKey (nicht canonical) behält "www.", damit nackte und www.-Variante
+        // beide geladen werden; identische Feeds fallen unten über die Content-Signatur weg.
+        val fresh = candidates.filter { triedUrls.add(FeedUrls.requestKey(it.url)) }
         val fetched = fresh.map { candidate ->
             async { candidate to runCatching { fetchAndParse(candidate.url, discoveryClient) }.getOrNull() }
         }.awaitAll()
