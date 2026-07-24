@@ -77,6 +77,15 @@ kotlin {
     }
 }
 
+// Die SSO-Bibliothek zieht transitiv eine neuere kotlin-stdlib (2.2.x), deren
+// Metadaten der 2.0.21-Compiler nicht lesen kann. Die Bibliothek selbst ist
+// Java – die stdlib auf die Projekt-Kotlin-Version zu pinnen ist daher sicher.
+configurations.all {
+    resolutionStrategy {
+        force("org.jetbrains.kotlin:kotlin-stdlib:${libs.versions.kotlin.get()}")
+    }
+}
+
 dependencies {
     implementation(project(":core"))
 
