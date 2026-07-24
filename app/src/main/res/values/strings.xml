@@ -97,4 +97,32 @@
     <string name="action_scroll_to_top">Zum Anfang springen</string>
     <string name="action_manage_feeds">Feeds verwalten</string>
     <string name="shortcut_feeds_short">Feeds</string>
+
+    <string name="settings_nextcloud">Nextcloud</string>
+    <string name="nextcloud_connect">Mit Nextcloud verbinden</string>
+    <string name="nextcloud_connect_hint">Feeds und Lesestatus von deinem Nextcloud-Server beziehen (News-App). Die Anmeldung läuft über die Nextcloud-App – Zugangsdaten berühren MyFeed nie.</string>
+    <string name="nextcloud_connect_checking">Verbinde …</string>
+    <string name="nextcloud_connected_as">Verbunden als %1$s</string>
+    <string name="nextcloud_disconnect">Konto trennen</string>
+    <string name="nextcloud_disconnect_confirm_title">Nextcloud-Konto trennen?</string>
+    <string name="nextcloud_disconnect_confirm_message">MyFeed wechselt zurück zu deinen lokalen Feeds. Die Freigabe in der Nextcloud-App bleibt bestehen.</string>
+    <string name="nextcloud_disconnect_delete_data">Nextcloud-Daten vom Gerät löschen</string>
+    <string name="nextcloud_mode_title">Quelle der Artikel</string>
+    <string name="nextcloud_mode_local">Lokale Feeds</string>
+    <string name="nextcloud_mode_nextcloud">Nextcloud News</string>
+    <string name="nextcloud_switch_confirm_title">Quelle wechseln?</string>
+    <string name="nextcloud_switch_confirm_message">Reader und Widget zeigen dann nur noch die gewählte Quelle. Beide Datenbestände bleiben erhalten – du kannst jederzeit zurückwechseln.</string>
+    <string name="nextcloud_files_app_missing">Die Nextcloud-App ist nicht installiert. Sie wird für die Anmeldung benötigt.</string>
+    <string name="nextcloud_news_app_missing">Auf dem Server ist die News-App nicht installiert.</string>
+    <string name="nextcloud_auth_required">Nextcloud-Anmeldung erforderlich – bitte erneut verbinden.</string>
+    <string name="nextcloud_server_unreachable">Nextcloud-Server nicht erreichbar.</string>
+    <string name="nextcloud_feed_rejected">Der Server hat den Feed abgelehnt (schon abonniert oder ungültig).</string>
+    <string name="nextcloud_opml_import_result">%1$d Feeds übernommen, %2$d fehlgeschlagen</string>
+    <string name="nextcloud_sync_error">Letzter Sync fehlgeschlagen: %1$s</string>
+    <string name="nextcloud_lifecycle">Aufbewahrung auch auf dem Server anwenden</string>
+    <string name="nextcloud_lifecycle_hint">Markiert abgelaufene ungelesene Artikel am Server als gelesen, damit das automatische Aufräumen von Nextcloud News sie entfernen kann. Gelöscht wird serverseitig – das Limit steht in den News-Admin-Einstellungen.</string>
+    <string name="nextcloud_lifecycle_confirm_title">Server-Aufräumen aktivieren?</string>
+    <string name="nextcloud_lifecycle_confirm_message">Artikel, die älter als deine Aufbewahrungsdauer sind, werden am Server als gelesen markiert. Das gilt kontoweit – auch in der Weboberfläche und anderen Apps.</string>
+    <string name="nextcloud_lifecycle_stars">Abgelaufene Lesezeichen auch entsternen</string>
+    <string name="nextcloud_lifecycle_stars_confirm_message">Lesezeichen, die älter als deine Lesezeichen-Frist sind, verlieren ihren Stern auch am Server – sichtbar für alle Geräte. Ein anderswo erneuerter Stern startet die Frist neu.</string>
 </resources>

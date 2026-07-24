@@ -28,10 +28,11 @@ import de.hippokratius.myfeed.AppGraph
 import de.hippokratius.myfeed.R
 import de.hippokratius.myfeed.core.catalog.CatalogCategory
 import de.hippokratius.myfeed.core.catalog.CatalogFeed
+import android.widget.Toast
 import de.hippokratius.myfeed.core.catalog.FeedCatalog
 import de.hippokratius.myfeed.core.catalog.FeedUrls
-import de.hippokratius.myfeed.data.FeedEntity
 import de.hippokratius.myfeed.fetch.FeedFetchWorker
+import de.hippokratius.myfeed.settings.AppSettings
 import kotlinx.coroutines.launch
 
 /**
@@ -42,7 +43,10 @@ import kotlinx.coroutines.launch
 fun DiscoverTab(graph: AppGraph) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val feeds by graph.feedDao.observeAll().collectAsState(initial = emptyList())
+    val settings by graph.settingsRepository.settings.collectAsState(initial = AppSettings())
+    val origin = settings.activeOrigin
+    val feeds by remember(origin) { graph.feedDao.observeAll(origin) }
+        .collectAsState(initial = emptyList())
     val addedUrls = remember(feeds) {
         feeds.map { FeedUrls.canonical(it.url) }.toSet()
     }
@@ -57,14 +61,17 @@ fun DiscoverTab(graph: AppGraph) {
 
     val addEntry: (CatalogFeed) -> Unit = { entry ->
         scope.launch {
-            graph.feedDao.insert(
-                FeedEntity(
+            runCatching {
+                graph.backendRegistry.current().addFeed(
                     url = entry.url,
                     title = entry.title,
                     category = context.getString(entry.category.labelRes()),
-                ),
-            )
-            FeedFetchWorker.syncNow(context)
+                )
+            }.onSuccess {
+                FeedFetchWorker.syncNow(context)
+            }.onFailure { throwable ->
+                Toast.makeText(context, backendErrorText(context, throwable), Toast.LENGTH_LONG).show()
+            }
         }
     }
 

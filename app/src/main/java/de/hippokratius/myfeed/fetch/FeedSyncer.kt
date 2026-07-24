@@ -1,30 +1,22 @@
 package de.hippokratius.myfeed.fetch
 
-import android.content.Context
 import android.util.Log
 import de.hippokratius.myfeed.core.catalog.FeedUrls
 import de.hippokratius.myfeed.core.discovery.DiscoveredFeed
 import de.hippokratius.myfeed.core.discovery.FeedLinkFinder
-import de.hippokratius.myfeed.core.grouping.ClusterCandidate
-import de.hippokratius.myfeed.core.grouping.TopicClusterer
 import de.hippokratius.myfeed.core.model.ParsedFeed
 import de.hippokratius.myfeed.core.rss.RssXmlParser
 import de.hippokratius.myfeed.data.ArticleDao
 import de.hippokratius.myfeed.data.ArticleEntity
 import de.hippokratius.myfeed.data.FeedDao
 import de.hippokratius.myfeed.data.FeedEntity
-import de.hippokratius.myfeed.settings.AppSettings
-import de.hippokratius.myfeed.settings.SettingsRepository
-import de.hippokratius.myfeed.widget.RssWidget
-import de.hippokratius.myfeed.widget.WidgetEntries
+import de.hippokratius.myfeed.data.Origin
 import java.io.ByteArrayInputStream
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -46,30 +38,23 @@ private class HttpStatusException(val code: Int, url: String) :
     java.io.IOException("HTTP $code für $url")
 
 /**
- * Kern der Aktualisierung: lädt alle aktiven Feeds, aktualisiert die Datenbank,
- * lädt Thumbnails, berechnet die Themen-Gruppen und stößt das Widget-Update an.
+ * RSS-Fetching für das lokale Backend: lädt alle lokalen Feeds und aktualisiert
+ * die Datenbank. Die Feed-Discovery ([resolveFeedInput]) wird auch vom
+ * Nextcloud-Backend genutzt (Website-URL → konkrete Feed-URL, dann POST an den
+ * Server). Nachverarbeitung (Aufbewahrung, Gruppen, Widget) macht der
+ * [SyncPostProcessor].
  */
 class FeedSyncer(
-    private val context: Context,
     private val feedDao: FeedDao,
     private val articleDao: ArticleDao,
-    private val settingsRepository: SettingsRepository,
+    val httpClient: OkHttpClient,
+    private val thumbnailStore: ThumbnailStore,
 ) {
-
-    val httpClient: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .build()
 
     /** Für die Feed-Suche im Dialog: harte Gesamtdauer pro Request statt Minuten-Timeouts. */
     private val discoveryClient: OkHttpClient = httpClient.newBuilder()
         .callTimeout(10, TimeUnit.SECONDS)
         .build()
-
-    private val thumbnailStore = ThumbnailStore(context, httpClient)
-    private val clusterer = TopicClusterer()
-    private val syncMutex = Mutex()
 
     /**
      * Löst die Nutzereingabe aus dem "Feed hinzufügen"-Dialog auf: Ist die URL selbst ein
@@ -150,44 +135,12 @@ class FeedSyncer(
         }
     }
 
-    suspend fun syncAll() = withContext(Dispatchers.IO) {
-        syncMutex.withLock {
-            val settings = settingsRepository.current()
-            val now = System.currentTimeMillis()
-
-            for (feed in feedDao.getEnabled()) {
-                runCatching { syncFeed(feed, now) }
-                    .onFailure { Log.w(TAG, "Feed ${feed.url} konnte nicht geladen werden", it) }
-            }
-
-            // Archivierte und gemerkte Artikel überleben die normale Aufbewahrung
-            // und werden erst nach ihrer jeweils eigenen Frist entfernt.
-            articleDao.deleteOlderThan(settings.feedCutoffMillis(now))
-            articleDao.deleteSavedOlderThan(
-                minArchivedAt = settings.archiveCutoffMillis(now),
-                minBookmarkedAt = settings.bookmarkCutoffMillis(now),
-            )
-            articleDao.enforceMaxCount(MAX_TOTAL_ARTICLES)
-
-            if (settings.showImages) {
-                downloadThumbnails(settings)
-            }
-            thumbnailStore.prune(
-                validArticleIds = articleDao.allIds().toSet(),
-                validFeedIds = feedDao.getAll().map { it.id }.toSet(),
-            )
-
-            regroup(settings)
-            settingsRepository.setLastSyncMillis(System.currentTimeMillis())
-            RssWidget.updateAll(context)
-        }
-    }
-
-    /** Gruppierung neu berechnen (auch ohne Netz-Sync, z. B. nach Settings-Änderung). */
-    suspend fun regroupAndRefreshWidget() = withContext(Dispatchers.IO) {
-        syncMutex.withLock {
-            regroup(settingsRepository.current())
-            RssWidget.updateAll(context)
+    /** Lädt alle lokalen Feeds und schreibt neue Artikel in die Datenbank. */
+    suspend fun fetchAllLocalFeeds() = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        for (feed in feedDao.getByOrigin(Origin.LOCAL)) {
+            runCatching { syncFeed(feed, now) }
+                .onFailure { Log.w(TAG, "Feed ${feed.url} konnte nicht geladen werden", it) }
         }
     }
 
@@ -220,6 +173,7 @@ class FeedSyncer(
                 publishedAt = item.publishedAtMillis ?: now,
                 fetchedAt = now,
                 groupId = null,
+                origin = Origin.LOCAL,
             )
         }
         articleDao.insertAll(articles)
@@ -272,51 +226,6 @@ class FeedSyncer(
         .header("Accept", accept)
         .build()
 
-    /**
-     * Thumbnails werden nur noch für Artikel vorab geladen, deren Bitmaps ein
-     * tatsächlich platziertes Widget rendert – Widgets können nicht lazy laden.
-     * Die App selbst lädt Bilder on-demand beim Scrollen (Coil-Cache), ohne
-     * platzierte Widgets entsteht beim Sync also kein Bild-Traffic.
-     */
-    private suspend fun downloadThumbnails(settings: AppSettings) {
-        val categories = RssWidget.configuredCategories(context)
-        if (categories.isEmpty()) return
-
-        val cutoff = settings.feedCutoffMillis(System.currentTimeMillis())
-        val candidates = LinkedHashMap<Long, ArticleEntity>()
-        for (category in categories.distinct()) {
-            val entries = WidgetEntries.build(articleDao, category, settings.filterWords, cutoff)
-            for (article in WidgetEntries.thumbCandidates(entries)) {
-                if (article.thumbPath == null && article.imageUrl != null) {
-                    candidates.putIfAbsent(article.id, article)
-                }
-            }
-        }
-
-        for (article in candidates.values.take(MAX_THUMB_DOWNLOADS_PER_SYNC)) {
-            val path = thumbnailStore.download(article.id, article.imageUrl ?: continue)
-            if (path != null) {
-                articleDao.setThumbPath(article.id, path)
-            }
-        }
-    }
-
-    private suspend fun regroup(settings: AppSettings) {
-        articleDao.clearGroups()
-        if (!settings.groupingEnabled) return
-
-        // Nur Artikel innerhalb der normalen Aufbewahrung gruppieren – alte
-        // Archiv-/Lesezeichen-Artikel tauchen im Feed nicht mehr auf.
-        val cutoff = settings.feedCutoffMillis(System.currentTimeMillis())
-        val candidates = articleDao.newest(GROUPING_ARTICLE_LIMIT, cutoff).map {
-            ClusterCandidate(it.id, it.title, it.publishedAt, sourceKey = it.feedId.toString())
-        }
-        for (group in clusterer.cluster(candidates)) {
-            // Stabil genug: Gruppen-ID aus der kleinsten Artikel-ID der Gruppe.
-            articleDao.setGroup(group, "g${group.min()}")
-        }
-    }
-
     companion object {
         private const val TAG = "FeedSyncer"
         const val USER_AGENT = "MyFeed/1.0 (+https://github.com/hippokratius/kveasitso-rss)"
@@ -329,8 +238,5 @@ class FeedSyncer(
             "application/rss+xml, application/atom+xml, application/xml, text/xml, */*"
         private const val ACCEPT_DISCOVERY = "$ACCEPT_FEED, text/html"
         private const val MAX_RESPONSE_BYTES = 10L * 1024 * 1024
-        private const val MAX_TOTAL_ARTICLES = 500
-        private const val MAX_THUMB_DOWNLOADS_PER_SYNC = 40
-        private const val GROUPING_ARTICLE_LIMIT = 300
     }
 }

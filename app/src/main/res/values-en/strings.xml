@@ -97,4 +97,32 @@
     <string name="action_scroll_to_top">Jump to top</string>
     <string name="action_manage_feeds">Manage feeds</string>
     <string name="shortcut_feeds_short">Feeds</string>
+
+    <string name="settings_nextcloud">Nextcloud</string>
+    <string name="nextcloud_connect">Connect to Nextcloud</string>
+    <string name="nextcloud_connect_hint">Fetch feeds and read status from your Nextcloud server (News app). Sign-in happens through the Nextcloud app – credentials never touch MyFeed.</string>
+    <string name="nextcloud_connect_checking">Connecting …</string>
+    <string name="nextcloud_connected_as">Connected as %1$s</string>
+    <string name="nextcloud_disconnect">Disconnect account</string>
+    <string name="nextcloud_disconnect_confirm_title">Disconnect Nextcloud account?</string>
+    <string name="nextcloud_disconnect_confirm_message">MyFeed switches back to your local feeds. The grant in the Nextcloud app remains in place.</string>
+    <string name="nextcloud_disconnect_delete_data">Delete Nextcloud data from this device</string>
+    <string name="nextcloud_mode_title">Article source</string>
+    <string name="nextcloud_mode_local">Local feeds</string>
+    <string name="nextcloud_mode_nextcloud">Nextcloud News</string>
+    <string name="nextcloud_switch_confirm_title">Switch source?</string>
+    <string name="nextcloud_switch_confirm_message">Reader and widget will only show the selected source. Both data sets are kept – you can switch back anytime.</string>
+    <string name="nextcloud_files_app_missing">The Nextcloud app is not installed. It is required for signing in.</string>
+    <string name="nextcloud_news_app_missing">The News app is not installed on the server.</string>
+    <string name="nextcloud_auth_required">Nextcloud sign-in required – please reconnect.</string>
+    <string name="nextcloud_server_unreachable">Nextcloud server unreachable.</string>
+    <string name="nextcloud_feed_rejected">The server rejected the feed (already subscribed or invalid).</string>
+    <string name="nextcloud_opml_import_result">%1$d feeds added, %2$d failed</string>
+    <string name="nextcloud_sync_error">Last sync failed: %1$s</string>
+    <string name="nextcloud_lifecycle">Apply retention to the server as well</string>
+    <string name="nextcloud_lifecycle_hint">Marks expired unread articles as read on the server so Nextcloud News\' automatic cleanup can remove them. Deletion happens server-side – the limit is set in the News admin settings.</string>
+    <string name="nextcloud_lifecycle_confirm_title">Enable server cleanup?</string>
+    <string name="nextcloud_lifecycle_confirm_message">Articles older than your retention period will be marked as read on the server. This applies account-wide – including the web UI and other apps.</string>
+    <string name="nextcloud_lifecycle_stars">Also unstar expired bookmarks</string>
+    <string name="nextcloud_lifecycle_stars_confirm_message">Bookmarks older than your bookmark retention lose their star on the server too – visible to all devices. A star renewed elsewhere restarts the clock.</string>
 </resources>

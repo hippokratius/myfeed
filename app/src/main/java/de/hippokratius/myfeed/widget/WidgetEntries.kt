@@ -61,11 +61,12 @@ object WidgetEntries {
         category: String? = null,
         filterWords: Collection<String> = emptySet(),
         minPublishedAt: Long = 0,
+        origin: String,
     ): WidgetData {
-        val icons = feedDao.getAll()
+        val icons = feedDao.getByOrigin(origin)
             .mapNotNull { feed -> feed.iconPath?.let { feed.id to it } }
             .toMap()
-        return WidgetData(build(articleDao, category, filterWords, minPublishedAt), icons)
+        return WidgetData(build(articleDao, category, filterWords, minPublishedAt, origin), icons)
     }
 
     /**
@@ -77,11 +78,17 @@ object WidgetEntries {
         category: String? = null,
         filterWords: Collection<String> = emptySet(),
         minPublishedAt: Long = 0,
+        origin: String,
     ): List<WidgetEntry> {
         val articles = if (category == null) {
-            articleDao.newest(limit = SOURCE_LIMIT, minPublishedAt = minPublishedAt)
+            articleDao.newest(limit = SOURCE_LIMIT, minPublishedAt = minPublishedAt, origin = origin)
         } else {
-            articleDao.newestInCategory(category, limit = SOURCE_LIMIT, minPublishedAt = minPublishedAt)
+            articleDao.newestInCategory(
+                category,
+                limit = SOURCE_LIMIT,
+                minPublishedAt = minPublishedAt,
+                origin = origin,
+            )
         }
         return fromArticles(articles, filterWords = filterWords)
     }

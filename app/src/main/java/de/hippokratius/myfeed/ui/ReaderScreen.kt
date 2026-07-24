@@ -104,9 +104,12 @@ fun ReaderScreen(
     onOpenSaved: () -> Unit,
 ) {
     val context = LocalContext.current
-    val feeds by graph.feedDao.observeAll().collectAsState(initial = emptyList())
-    val categories by graph.feedDao.observeCategories().collectAsState(initial = emptyList())
     val settings by graph.settingsRepository.settings.collectAsState(initial = AppSettings())
+    val origin = settings.activeOrigin
+    val feeds by remember(origin) { graph.feedDao.observeAll(origin) }
+        .collectAsState(initial = emptyList())
+    val categories by remember(origin) { graph.feedDao.observeCategories(origin) }
+        .collectAsState(initial = emptyList())
     val syncRunning by FeedFetchWorker.observeSyncRunning(context).collectAsState(initial = false)
 
     var selectedCategory by rememberSaveable { mutableStateOf<String?>(null) }
@@ -116,13 +119,13 @@ fun ReaderScreen(
 
     // Ohne Limit: Der Reader zeigt alle Artikel innerhalb der Aufbewahrungsdauer.
     // Nur wegen Archiv/Lesezeichen länger aufbewahrte Artikel bleiben außen vor.
-    val articlesFlow = remember(effectiveCategory, settings.maxAgeDays) {
+    val articlesFlow = remember(effectiveCategory, settings.maxAgeDays, origin) {
         val cutoff = settings.feedCutoffMillis(System.currentTimeMillis())
         effectiveCategory.let { category ->
             if (category == null) {
-                graph.articleDao.observeAllNewest(cutoff)
+                graph.articleDao.observeAllNewest(cutoff, origin)
             } else {
-                graph.articleDao.observeAllNewestInCategory(category, cutoff)
+                graph.articleDao.observeAllNewestInCategory(category, cutoff, origin)
             }
         }
     }
@@ -211,7 +214,7 @@ fun ReaderScreen(
                     .map { it.id }
                 if (ids.isNotEmpty()) {
                     sessionReadIds = sessionReadIds + ids
-                    graph.articleDao.markRead(ids, System.currentTimeMillis())
+                    graph.backendRegistry.current().markRead(ids, System.currentTimeMillis())
                 }
                 seenStableIds += visibleKeys.filterIsInstance<Long>()
             }
@@ -708,15 +711,16 @@ internal fun openArticleAndArchive(
     article: ArticleEntity,
 ) {
     graph.applicationScope.launch {
-        graph.articleDao.markArchived(article.id, System.currentTimeMillis())
+        // Im Nextcloud-Modus gilt der Artikel damit zusätzlich als gelesen (E6).
+        graph.backendRegistry.current().markOpened(article.id, System.currentTimeMillis())
     }
     openLink(context, article.link)
 }
 
-/** Setzt oder entfernt das Lesezeichen eines Artikels. */
+/** Setzt oder entfernt das Lesezeichen eines Artikels (Nextcloud: Stern). */
 internal fun toggleBookmark(graph: AppGraph, article: ArticleEntity) {
     graph.applicationScope.launch {
-        graph.articleDao.setBookmarked(
+        graph.backendRegistry.current().setBookmarked(
             article.id,
             if (article.isBookmarked) null else System.currentTimeMillis(),
         )

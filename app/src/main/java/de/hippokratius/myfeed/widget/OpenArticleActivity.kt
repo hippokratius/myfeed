@@ -24,7 +24,9 @@ class OpenArticleActivity : Activity() {
         if (articleId >= 0) {
             val graph = (application as MyFeedApp).graph
             graph.applicationScope.launch {
-                graph.articleDao.markArchived(articleId, System.currentTimeMillis())
+                // Archiviert lokal; im Nextcloud-Modus gilt der Artikel damit
+                // zusätzlich als gelesen (Push beim nächsten Sync, E6).
+                graph.backendRegistry.current().markOpened(articleId, System.currentTimeMillis())
             }
         }
         if (!link.isNullOrBlank()) {

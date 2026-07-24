@@ -38,7 +38,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -68,6 +67,7 @@ import de.hippokratius.myfeed.core.opml.OpmlParser
 import de.hippokratius.myfeed.data.FeedEntity
 import de.hippokratius.myfeed.fetch.FeedFetchWorker
 import de.hippokratius.myfeed.fetch.FeedResolution
+import de.hippokratius.myfeed.settings.AppSettings
 import java.io.IOException
 import java.text.Collator
 import kotlinx.coroutines.Dispatchers
@@ -100,8 +100,12 @@ fun FeedsScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val feeds by graph.feedDao.observeAll().collectAsState(initial = emptyList())
-    val categories by graph.feedDao.observeCategories().collectAsState(initial = emptyList())
+    val settings by graph.settingsRepository.settings.collectAsState(initial = AppSettings())
+    val origin = settings.activeOrigin
+    val feeds by remember(origin) { graph.feedDao.observeAll(origin) }
+        .collectAsState(initial = emptyList())
+    val categories by remember(origin) { graph.feedDao.observeCategories(origin) }
+        .collectAsState(initial = emptyList())
 
     var selectedTab by rememberSaveable { mutableIntStateOf(initialTab) }
     var showAddDialog by remember { mutableStateOf(false) }
@@ -157,19 +161,18 @@ fun FeedsScreen(
                     }.orEmpty()
                 }.getOrDefault(emptyList())
             }
-            var added = 0
-            for (feed in imported) {
-                val id = graph.feedDao.insert(
-                    FeedEntity(url = feed.xmlUrl, title = feed.title.orEmpty(), category = feed.category),
-                )
-                if (id != -1L) added++
+            val result = runCatching { graph.backendRegistry.current().importOpml(imported) }
+                .getOrElse { throwable ->
+                    Toast.makeText(context, backendErrorText(context, throwable), Toast.LENGTH_LONG).show()
+                    return@launch
+                }
+            val message = if (result.failed > 0) {
+                context.getString(R.string.nextcloud_opml_import_result, result.added, result.failed)
+            } else {
+                context.getString(R.string.opml_imported, result.added)
             }
-            Toast.makeText(
-                context,
-                context.getString(R.string.opml_imported, added),
-                Toast.LENGTH_SHORT,
-            ).show()
-            if (added > 0) FeedFetchWorker.syncNow(context)
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            if (result.added > 0) FeedFetchWorker.syncNow(context)
         }
     }
 
@@ -241,12 +244,6 @@ fun FeedsScreen(
                     hasUncategorized = hasUncategorized,
                     selectedFilter = selectedFilter,
                     onSelectFilter = { selectedFilter = it },
-                    onToggle = { feed, enabled ->
-                        scope.launch {
-                            graph.feedDao.update(feed.copy(enabled = enabled))
-                            graph.feedSyncer.regroupAndRefreshWidget()
-                        }
-                    },
                     onDelete = { deleteFeed = it },
                     onEditCategory = { editCategoryFeed = it },
                     onOpenDiscover = { selectedTab = FeedsTab.DISCOVER },
@@ -265,10 +262,13 @@ fun FeedsScreen(
             // Im Screen-Scope einfügen: Der Dialog-Scope stirbt beim Schließen sofort.
             onAdd = { feedUrl, title, feedCategory ->
                 scope.launch {
-                    graph.feedDao.insert(
-                        FeedEntity(url = feedUrl, title = title.orEmpty(), category = feedCategory),
-                    )
-                    FeedFetchWorker.syncNow(context)
+                    runCatching {
+                        graph.backendRegistry.current().addFeed(feedUrl, title, feedCategory)
+                    }.onSuccess {
+                        FeedFetchWorker.syncNow(context)
+                    }.onFailure { throwable ->
+                        Toast.makeText(context, backendErrorText(context, throwable), Toast.LENGTH_LONG).show()
+                    }
                 }
             },
             onDismiss = { showAddDialog = false },
@@ -283,8 +283,11 @@ fun FeedsScreen(
             onSave = { category ->
                 editCategoryFeed = null
                 scope.launch {
-                    graph.feedDao.updateCategory(feed.id, category)
-                    graph.feedSyncer.regroupAndRefreshWidget()
+                    runCatching {
+                        graph.backendRegistry.current().setCategory(feed, category)
+                    }.onFailure { throwable ->
+                        Toast.makeText(context, backendErrorText(context, throwable), Toast.LENGTH_LONG).show()
+                    }
                 }
             },
         )
@@ -302,8 +305,15 @@ fun FeedsScreen(
                     onClick = {
                         deleteFeed = null
                         scope.launch {
-                            graph.feedDao.delete(feed)
-                            graph.feedSyncer.regroupAndRefreshWidget()
+                            runCatching {
+                                graph.backendRegistry.current().deleteFeed(feed)
+                            }.onFailure { throwable ->
+                                Toast.makeText(
+                                    context,
+                                    backendErrorText(context, throwable),
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                            }
                         }
                     },
                 ) {
@@ -329,7 +339,6 @@ private fun ManageFeedsTab(
     hasUncategorized: Boolean,
     selectedFilter: String?,
     onSelectFilter: (String?) -> Unit,
-    onToggle: (FeedEntity, Boolean) -> Unit,
     onDelete: (FeedEntity) -> Unit,
     onEditCategory: (FeedEntity) -> Unit,
     onOpenDiscover: () -> Unit,
@@ -360,7 +369,6 @@ private fun ManageFeedsTab(
             val feedRow: @Composable (FeedEntity) -> Unit = { feed ->
                 FeedRow(
                     feed = feed,
-                    onToggle = { enabled -> onToggle(feed, enabled) },
                     onDelete = { onDelete(feed) },
                     onEditCategory = { onEditCategory(feed) },
                 )
@@ -440,7 +448,6 @@ private fun CategoryFilterRow(
 @Composable
 private fun FeedRow(
     feed: FeedEntity,
-    onToggle: (Boolean) -> Unit,
     onDelete: () -> Unit,
     onEditCategory: () -> Unit,
 ) {
@@ -466,7 +473,6 @@ private fun FeedRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Switch(checked = feed.enabled, onCheckedChange = onToggle)
         IconButton(onClick = onDelete) {
             Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.action_delete))
         }
