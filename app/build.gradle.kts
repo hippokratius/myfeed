@@ -99,4 +99,8 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.coil.compose)
     implementation(libs.kotlinx.coroutines.android)
+
+    // Nextcloud-Backend: Konto + Netzwerk über die Files-App (SSO), JSON in :core.
+    implementation(libs.nextcloud.sso)
+    implementation(libs.kotlinx.serialization.json)
 }

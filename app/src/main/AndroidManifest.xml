@@ -3,6 +3,11 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Ab Android 11 nötig, um die Nextcloud-Files-App zu sehen (SSO-Login). -->
+    <queries>
+        <package android:name="com.nextcloud.client" />
+    </queries>
+
     <application
         android:name=".MyFeedApp"
         android:allowBackup="true"
