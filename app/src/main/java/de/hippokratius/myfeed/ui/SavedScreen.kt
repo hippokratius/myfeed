@@ -60,9 +60,12 @@ fun SavedScreen(
     onBack: () -> Unit,
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-    val bookmarked by graph.articleDao.observeBookmarked().collectAsState(initial = emptyList())
-    val archived by graph.articleDao.observeArchived().collectAsState(initial = emptyList())
     val settings by graph.settingsRepository.settings.collectAsState(initial = AppSettings())
+    val origin = settings.activeOrigin
+    val bookmarked by remember(origin) { graph.articleDao.observeBookmarked(origin) }
+        .collectAsState(initial = emptyList())
+    val archived by remember(origin) { graph.articleDao.observeArchived(origin) }
+        .collectAsState(initial = emptyList())
 
     Scaffold(
         topBar = {

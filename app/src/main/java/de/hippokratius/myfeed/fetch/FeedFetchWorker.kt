@@ -24,7 +24,7 @@ class FeedFetchWorker(
     override suspend fun doWork(): Result {
         val app = applicationContext as MyFeedApp
         return try {
-            app.graph.feedSyncer.syncAll()
+            app.graph.backendRegistry.current().syncAll()
             Result.success()
         } catch (e: Exception) {
             if (runAttemptCount < 3) Result.retry() else Result.failure()

@@ -149,7 +149,7 @@ fun SettingsScreen(
                 onCheckedChange = { checked ->
                     scope.launch {
                         graph.settingsRepository.setShowImages(checked)
-                        graph.feedSyncer.regroupAndRefreshWidget()
+                        graph.syncPostProcessor.regroupAndRefreshWidget()
                     }
                 },
             )
@@ -159,7 +159,7 @@ fun SettingsScreen(
                 onCheckedChange = { checked ->
                     scope.launch {
                         graph.settingsRepository.setGroupingEnabled(checked)
-                        graph.feedSyncer.regroupAndRefreshWidget()
+                        graph.syncPostProcessor.regroupAndRefreshWidget()
                     }
                 },
             )
@@ -217,12 +217,16 @@ fun SettingsScreen(
                     },
                 )
             }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+            NextcloudSettingsSection(graph = graph, settings = settings)
         }
     }
 }
 
 @Composable
-private fun SectionTitle(text: String) {
+internal fun SectionTitle(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.titleSmall,
@@ -293,7 +297,7 @@ private fun FilterWordRow(word: String, onDelete: () -> Unit) {
 }
 
 @Composable
-private fun SwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+internal fun SwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,

@@ -11,6 +11,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Nextcloud-SingleSignOn wird nur über JitPack veröffentlicht.
+        maven("https://jitpack.io")
     }
 }
 

@@ -20,12 +20,38 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.nextcloud.android.sso.AccountImporter
 import de.hippokratius.myfeed.MyFeedApp
 import java.net.URLEncoder
 
 class MainActivity : ComponentActivity() {
 
     private var pendingRoute by mutableStateOf<String?>(null)
+
+    /**
+     * Rückweg der Nextcloud-Kontoauswahl: Die SSO-Bibliothek arbeitet mit dem
+     * klassischen onActivityResult-Protokoll (sie besitzt den Request-Code,
+     * daher keine Umstellung auf die Activity-Result-API möglich).
+     */
+    @Deprecated("SSO-Bibliothek nutzt das klassische onActivityResult-Protokoll")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        runCatching {
+            AccountImporter.onActivityResult(requestCode, resultCode, data, this) { account ->
+                (application as MyFeedApp).graph.ssoSessionManager.onAccountGranted(account)
+            }
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        AccountImporter.onRequestPermissionsResult(requestCode, permissions, grantResults, this)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

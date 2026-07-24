@@ -110,3 +110,20 @@ app/   Android-App:
        └── ui/        Compose: Vollbild-Reader, Feed-Verwaltung, OPML,
                       Einstellungen, Gruppen-Ansicht
 ```
+
+## Nextcloud News (optional)
+
+MyFeed kann statt lokaler RSS-Feeds eine **Nextcloud-News-Instanz** als
+Backend nutzen ([Konzept](docs/konzept-nextcloud-news.md)):
+
+- Anmeldung per Single Sign-On über die **Nextcloud-App** (wie bei Nextcloud
+  Talk) – Zugangsdaten berühren MyFeed nie
+- Feeds, Gelesen-Status und Lesezeichen (= Sterne) geräteübergreifend synchron;
+  Feed-Verwaltung, OPML-Import und „Entdecken“ arbeiten gegen den Server
+  (Ordner = Kategorien), offline lesen/markieren funktioniert weiter
+- Umschalten unter **Einstellungen → Nextcloud**; lokale Feeds bleiben dabei
+  erhalten und sind nach dem Zurückschalten sofort wieder da
+- Opt-in **Server-Aufräumen**: wendet die MyFeed-Aufbewahrungsregeln auch auf
+  dem Server an (abgelaufene ungelesene Artikel werden als gelesen markiert,
+  optional Lesezeichen entsternt), damit der Auto-Purge von Nextcloud News
+  die Datenbank klein hält

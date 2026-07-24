@@ -52,6 +52,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Von der Nextcloud-SSO-Bibliothek verlangt (java.time & Co. auf minSdk 26).
+        isCoreLibraryDesugaringEnabled = true
     }
 
     buildFeatures {
@@ -72,6 +74,15 @@ android {
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
+// Die SSO-Bibliothek zieht transitiv eine neuere kotlin-stdlib (2.2.x), deren
+// Metadaten der 2.0.21-Compiler nicht lesen kann. Die Bibliothek selbst ist
+// Java – die stdlib auf die Projekt-Kotlin-Version zu pinnen ist daher sicher.
+configurations.all {
+    resolutionStrategy {
+        force("org.jetbrains.kotlin:kotlin-stdlib:${libs.versions.kotlin.get()}")
     }
 }
 
@@ -99,4 +110,9 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.coil.compose)
     implementation(libs.kotlinx.coroutines.android)
+
+    // Nextcloud-Backend: Konto + Netzwerk über die Files-App (SSO), JSON in :core.
+    implementation(libs.nextcloud.sso)
+    implementation(libs.kotlinx.serialization.json)
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
 }

@@ -78,12 +78,14 @@ class RssWidget : GlanceAppWidget() {
         // Pro Widget-Instanz konfigurierte Kategorie; fehlt der Key, zeigt das Widget alles.
         val category = getAppWidgetState(context, PreferencesGlanceStateDefinition, id)[KEY_CATEGORY]
         val settings = app.graph.settingsRepository.current()
+        val origin = settings.activeOrigin
         val data = WidgetEntries.buildData(
             app.graph.articleDao,
             app.graph.feedDao,
             category,
             settings.filterWords,
             minPublishedAt = settings.feedCutoffMillis(System.currentTimeMillis()),
+            origin = origin,
         )
         val bitmaps = if (settings.showImages) {
             loadBitmaps(data)
@@ -91,9 +93,9 @@ class RssWidget : GlanceAppWidget() {
             WidgetBitmaps(emptyMap(), emptyMap(), loadFeedIcons(data))
         }
         val hasFeeds = if (category == null) {
-            app.graph.feedDao.count() > 0
+            app.graph.feedDao.count(origin) > 0
         } else {
-            app.graph.feedDao.countInCategory(category) > 0
+            app.graph.feedDao.countInCategory(category, origin) > 0
         }
 
         provideContent {

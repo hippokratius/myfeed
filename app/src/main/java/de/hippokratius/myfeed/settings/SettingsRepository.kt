@@ -5,8 +5,11 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import de.hippokratius.myfeed.backend.BackendMode
+import de.hippokratius.myfeed.data.Origin
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -32,7 +35,23 @@ data class AppSettings(
     val lastSyncMillis: Long = 0,
     /** Artikel, deren Titel eines dieser Wörter enthält, werden ausgeblendet. */
     val filterWords: Set<String> = emptySet(),
+    /** Aktives Backend: lokale RSS-Feeds oder Nextcloud News (exklusiv). */
+    val backendMode: BackendMode = BackendMode.LOCAL_RSS,
+    /** Sync-Cursor der News-API in Epoch-Sekunden, 0 = Initial-Sync ausstehend. */
+    val ncLastModified: Long = 0,
+    /** Anzeigename des verbundenen Kontos (Wahrheit liegt bei der SSO-Bibliothek). */
+    val ncAccountName: String? = null,
+    /** Letzter Nextcloud-Sync-Fehler für die Anzeige in den Einstellungen. */
+    val ncLastSyncError: String? = null,
+    /** §4.3: Aufbewahrungsregeln auch auf dem Server anwenden (Gelesen-Markieren). */
+    val ncManageLifecycle: Boolean = false,
+    /** §4.3: zusätzlich abgelaufene Lesezeichen am Server entsternen. */
+    val ncManageStars: Boolean = false,
 ) {
+    /** Herkunfts-Filter für alle lesenden Queries des aktiven Backends. */
+    val activeOrigin: String
+        get() = if (backendMode == BackendMode.NEXTCLOUD_NEWS) Origin.NEXTCLOUD else Origin.LOCAL
+
     /** Ältestes publishedAt, das im normalen Feed noch angezeigt wird. */
     fun feedCutoffMillis(now: Long): Long = now - maxAgeDays * DAY_MILLIS
 
@@ -63,6 +82,17 @@ class SettingsRepository(private val context: Context) {
         val hideRead = booleanPreferencesKey("hide_read")
         val lastSync = longPreferencesKey("last_sync_millis")
         val filterWords = stringSetPreferencesKey("filter_words")
+        val backendMode = stringPreferencesKey("backend_mode")
+        val ncLastModified = longPreferencesKey("nc_last_modified")
+        val ncAccountName = stringPreferencesKey("nc_account_name")
+        val ncLastSyncError = stringPreferencesKey("nc_last_sync_error")
+        val ncManageLifecycle = booleanPreferencesKey("nc_manage_lifecycle")
+        val ncManageStars = booleanPreferencesKey("nc_manage_stars")
+    }
+
+    private companion object {
+        const val MODE_LOCAL = "local"
+        const val MODE_NEXTCLOUD = "nextcloud"
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { prefs ->
@@ -76,6 +106,16 @@ class SettingsRepository(private val context: Context) {
             hideRead = prefs[Keys.hideRead] ?: false,
             lastSyncMillis = prefs[Keys.lastSync] ?: 0,
             filterWords = prefs[Keys.filterWords] ?: emptySet(),
+            backendMode = if (prefs[Keys.backendMode] == MODE_NEXTCLOUD) {
+                BackendMode.NEXTCLOUD_NEWS
+            } else {
+                BackendMode.LOCAL_RSS
+            },
+            ncLastModified = prefs[Keys.ncLastModified] ?: 0,
+            ncAccountName = prefs[Keys.ncAccountName],
+            ncLastSyncError = prefs[Keys.ncLastSyncError],
+            ncManageLifecycle = prefs[Keys.ncManageLifecycle] ?: false,
+            ncManageStars = prefs[Keys.ncManageStars] ?: false,
         )
     }
 
@@ -129,5 +169,40 @@ class SettingsRepository(private val context: Context) {
             val current = prefs[Keys.filterWords] ?: emptySet()
             prefs[Keys.filterWords] = current - word
         }
+    }
+
+    suspend fun setBackendMode(mode: BackendMode) {
+        context.dataStore.edit {
+            it[Keys.backendMode] =
+                if (mode == BackendMode.NEXTCLOUD_NEWS) MODE_NEXTCLOUD else MODE_LOCAL
+        }
+    }
+
+    suspend fun setNcLastModified(seconds: Long) {
+        context.dataStore.edit { it[Keys.ncLastModified] = seconds }
+    }
+
+    suspend fun setNcAccountName(name: String?) {
+        context.dataStore.edit { prefs ->
+            if (name == null) prefs.remove(Keys.ncAccountName) else prefs[Keys.ncAccountName] = name
+        }
+    }
+
+    suspend fun setNcLastSyncError(message: String?) {
+        context.dataStore.edit { prefs ->
+            if (message == null) {
+                prefs.remove(Keys.ncLastSyncError)
+            } else {
+                prefs[Keys.ncLastSyncError] = message
+            }
+        }
+    }
+
+    suspend fun setNcManageLifecycle(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.ncManageLifecycle] = enabled }
+    }
+
+    suspend fun setNcManageStars(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.ncManageStars] = enabled }
     }
 }

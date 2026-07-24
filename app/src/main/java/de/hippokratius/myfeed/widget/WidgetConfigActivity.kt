@@ -70,7 +70,9 @@ class WidgetConfigActivity : ComponentActivity() {
                 ConfigScreen(
                     loadInitial = {
                         val glanceId = GlanceAppWidgetManager(this).getGlanceIdBy(appWidgetId)
-                        val categories = graph.feedDao.getCategories()
+                        val categories = graph.feedDao.getCategories(
+                            graph.settingsRepository.current().activeOrigin,
+                        )
                         val current = getAppWidgetState(
                             this,
                             PreferencesGlanceStateDefinition,
