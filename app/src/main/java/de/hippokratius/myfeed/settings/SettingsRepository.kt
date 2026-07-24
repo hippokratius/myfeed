@@ -26,7 +26,7 @@ data class AppSettings(
      * Aufbewahrung von Artikeln mit Lesezeichen in Tagen – unabhängig vom
      * Archiv einstellbar, ebenfalls nie kürzer als die normale Aufbewahrung.
      */
-    val bookmarkMaxAgeDays: Int = 90,
+    val bookmarkMaxAgeDays: Int = 60,
     val showImages: Boolean = true,
     val groupingEnabled: Boolean = true,
     /** Gelesene Artikel im Reader ausblenden statt nur ausgrauen. */
@@ -100,7 +100,7 @@ class SettingsRepository(private val context: Context) {
             refreshIntervalMinutes = prefs[Keys.refreshInterval] ?: 30,
             maxAgeDays = prefs[Keys.maxAgeDays] ?: 7,
             archiveMaxAgeDays = prefs[Keys.archiveMaxAgeDays] ?: 30,
-            bookmarkMaxAgeDays = prefs[Keys.bookmarkMaxAgeDays] ?: 90,
+            bookmarkMaxAgeDays = prefs[Keys.bookmarkMaxAgeDays] ?: 60,
             showImages = prefs[Keys.showImages] ?: true,
             groupingEnabled = prefs[Keys.groupingEnabled] ?: true,
             hideRead = prefs[Keys.hideRead] ?: false,
