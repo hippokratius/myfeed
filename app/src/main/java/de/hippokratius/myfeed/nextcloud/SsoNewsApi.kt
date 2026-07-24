@@ -95,8 +95,9 @@ class SsoNewsApi(private val sessionManager: SsoSessionManager) : NewsApi {
         if (route.query.isNotEmpty()) {
             builder.setParameter(route.query.map { (key, value) -> QueryParam(key, value) })
         }
-        if (route.body != null) {
-            builder.setRequestBody(route.body)
+        val body = route.body
+        if (body != null) {
+            builder.setRequestBody(body)
             builder.setHeader(mapOf("Content-Type" to listOf("application/json")))
         }
         return builder.build()

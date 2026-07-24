@@ -154,9 +154,10 @@ class NextcloudNewsBackend(
                     remoteId = insert.remoteId,
                 ),
             )
-            if (id != -1L && insert.iconUrl != null) {
-                thumbnailStore.downloadIcon(id, insert.iconUrl)?.let { path ->
-                    feedDao.updateIcon(id, insert.iconUrl, path)
+            val insertIconUrl = insert.iconUrl
+            if (id != -1L && insertIconUrl != null) {
+                thumbnailStore.downloadIcon(id, insertIconUrl)?.let { path ->
+                    feedDao.updateIcon(id, insertIconUrl, path)
                 }
             }
         }
