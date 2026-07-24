@@ -35,7 +35,7 @@ Nicht Teil dieses Konzepts:
 | E2 | **Pending-Deltas als Flag-Spalten** (`pendingReadSync`, `pendingStarSync`) statt einer Operations-Tabelle. | Es gibt nur zwei pushbare Änderungen: „gelesen“ ist einweg (kein Ungelesen-UI in MyFeed), „Stern“ ist ein Toggle. Dirty-Flag + aktueller Spaltenwert ergibt die Push-Richtung (Last-Writer-Wins), keine Op-Reihenfolge nötig. Aufbewahrungs-Löschungen verschonen Zeilen mit gesetztem Flag; gepusht wird vor dem Aufräumen. |
 | E3 | **Beide Datenbestände bleiben in der DB**, getrennt über eine `origin`-Spalte; lesende Queries filtern nach dem aktiven Origin. | Umschalten ist damit verlustfrei und sofort reversibel – nichts wird kopiert oder gelöscht. Nextcloud-Daten werden erst bei explizitem „Konto trennen“ (mit Rückfrage) entfernt. |
 | E4 | **JSON über kotlinx-serialization in `:core`** (`ignoreUnknownKeys = true`, `decodeFromStream`). | Rein JVM, damit im bestehenden `:core`-Testsetup testbar. *Alternative*: das mit der SSO-Bibliothek gebündelte Gson – funktioniert, ist aber reflexionsbasiert, nicht null-sicher und würde `:core` an eine `:app`-Abhängigkeit binden. Gson wird nur intern für den `NextcloudAPI`-Konstruktor verwendet. |
-| E5 | **Pro-Feed-Aktiv-Schalter im Nextcloud-Modus ausblenden.** | Der Schalter steuert heute nur das Abrufen (`FeedDao.getEnabled()`); der Reader filtert nicht danach. Im Nextcloud-Modus liefert ein einziger API-Aufruf die Items aller Feeds – der Schalter wäre wirkungslos. Feeds stummschalten heißt dort: am Server löschen oder per Wortfilter arbeiten. |
+| E5 | **Pro-Feed-Aktiv-Schalter wird generell entfernt** – app-weit, in beiden Modi. | Der Schalter steuert heute nur das Abrufen (`FeedDao.getEnabled()`); der Reader filtert nicht danach. Im Nextcloud-Modus liefert ein einziger API-Aufruf die Items aller Feeds – dort wäre er ohnehin wirkungslos. Statt ihn nur im Nextcloud-Modus auszublenden, fliegt er komplett raus: keine Modus-Asymmetrie, einfachere Backend-Naht, und die `enabled`-Spalte kann beim ohnehin nötigen `feeds`-Rebuild der Migration (§6) mit entfallen. Ersatz: Feed löschen oder Wortfilter. Dieser Mini-Refactor (Switch in `FeedsScreen` raus, `getEnabled()` → alle Feeds) ist unabhängig von der Nextcloud-Integration und kann vorgezogen werden. |
 | E6 | **Artikel öffnen setzt im Nextcloud-Modus zusätzlich „gelesen“** (Push an den Server); das Archiv selbst bleibt ein rein lokales Konzept. | Geöffnete Artikel sollen in der Nextcloud-Weboberfläche als gelesen erscheinen. Nextcloud News kennt kein „Archiv“ – `archivedAt` wird nie synchronisiert. |
 | E7 | **Feed-Discovery bleibt clientseitig**: Die bestehende Auflösung (`FeedSyncer.resolveFeedInput()`) läuft vor dem `POST /feeds`. | Identische UX in beiden Modi (Website-URL eingeben → Vorschläge); der Server erhält immer eine konkrete Feed-URL, weniger Fehlversuche. |
 | E8 | **Server-Lebenszyklus-Management als Opt-in** (§4.3): Auf Wunsch wendet MyFeed seine Aufbewahrungsregeln auch auf den Server-Bestand an – durch **Gelesen-Markieren** abgelaufener ungelesener Artikel und optional **Entsternen** abgelaufener Lesezeichen. | Die News-API kann Artikel nicht löschen; gelöscht wird nur durch den server-seitigen Auto-Purge, und der entfernt ausschließlich *gelesene, nicht gesternte* Artikel. Ungelesene/gesternte Altartikel sammeln sich sonst unbegrenzt an und können die News-Datenbank auffressen. Default: aus, weil die Aktion für alle Clients des Kontos sichtbar ist. |
@@ -266,7 +266,7 @@ enum class BackendMode { LOCAL_RSS, NEXTCLOUD_NEWS }
 object Origin { const val LOCAL = "LOCAL"; const val NEXTCLOUD = "NEXTCLOUD" }
 
 data class BackendCapabilities(
-    val perFeedEnableSwitch: Boolean,      // nur lokal (E5)
+    // Der Pro-Feed-Aktiv-Schalter entfällt generell (E5) – aktuell einziges Feld:
     val feedManagementNeedsNetwork: Boolean,
 )
 
@@ -336,6 +336,10 @@ existieren):
 
 - `+ origin TEXT NOT NULL DEFAULT 'LOCAL'`
 - `+ remoteId INTEGER` (News-Feed-ID)
+- `− enabled` entfällt (E5) – der Rebuild macht das Entfernen kostenlos.
+  Konsequenz: zuvor deaktivierte Feeds werden mit dem Update wieder aktiv
+  (bewusst so; wer einen Feed nicht mehr will, löscht ihn oder nutzt den
+  Wortfilter).
 - Indizes: `UNIQUE(origin, url)`, `UNIQUE(origin, remoteId)`, `category` wie gehabt
 
 **`articles`** – nur `ALTER TABLE ADD COLUMN`:
@@ -355,7 +359,9 @@ Schema-Validierung; der DB-Dateiname `kvaesitso-rss.db` bleibt unverändert.
 
 **DAO-Erweiterungen (Auszug):** origin-Parameter für alle lesenden und aufräumenden
 Queries (`observeAllNewest`, `observeArchived/Bookmarked`, `deleteOlderThan`,
-`enforceMaxCount`, …); neu: `byRemoteId`, `markReadPending(ids, readAt)`,
+`enforceMaxCount`, …); `FeedDao.getEnabled()` entfällt mit dem Schalter (E5) und
+wird durch origin-bezogenes `getByOrigin(origin)` ersetzt; neu:
+`byRemoteId`, `markReadPending(ids, readAt)`,
 `setBookmarkedPending(id, ts)`, `pendingRead/Star/UnstarRemoteIds()`,
 `clearPendingRead/Star(remoteIds)` sowie ein Merge-Update, das `readAt`/`bookmarkedAt`
 nur bei nicht gesetztem Pending-Flag überschreibt. Aufräum-Queries erhalten zusätzlich
@@ -381,7 +387,7 @@ und `expireBookmarks(origin, minBookmarkedAt)` (löscht `bookmarkedAt`, setzt
 | `MainActivity` | `onActivityResult` an `AccountImporter.onActivityResult` weiterleiten. |
 | `ReaderScreen` | Queries mit `origin = aktives Origin`; Scroll-Tracking ruft `backend.markRead`, Öffnen `backend.markOpened`, Lesezeichen `backend.setBookmarked`. Sonst unverändert. |
 | `SavedScreen` / `GroupScreen` | Nur origin-bezogene Queries. |
-| `FeedsScreen` | Hinzufügen/Löschen/Kategorie über das aktive Backend (Nextcloud: Server-Aufrufe mit Fortschritt und Fehler-Feedback, Ordner werden bei Bedarf angelegt); OPML-Import → `backend.importOpml` (Nextcloud: je Eintrag `POST /feeds`, Ergebnis „X hinzugefügt, Y fehlgeschlagen“); Aktiv-Schalter nur bei `capabilities.perFeedEnableSwitch` (E5). |
+| `FeedsScreen` | Hinzufügen/Löschen/Kategorie über das aktive Backend (Nextcloud: Server-Aufrufe mit Fortschritt und Fehler-Feedback, Ordner werden bei Bedarf angelegt); OPML-Import → `backend.importOpml` (Nextcloud: je Eintrag `POST /feeds`, Ergebnis „X hinzugefügt, Y fehlgeschlagen“); der Pro-Feed-Aktiv-Schalter (`FeedRow`-Switch) wird generell entfernt (E5). |
 | `DiscoverScreen` | One-Tap-Add → `backend.addFeed` (Katalog-Kategorie wird zum Ordner). |
 | Widget (`WidgetEntries`, `RssWidget`, `WidgetConfigActivity`) | Queries und Kategorienliste origin-bezogen; sonst unverändert. |
 | `OpenArticleActivity` | Archivieren über `backend.markOpened` (E6). |
@@ -400,7 +406,7 @@ inkl. Hinweis auf den Server-Purge.
 | Katalog „Entdecken“ / OPML-Import | ja | ja (an den Server, Kategorie→Ordner automatisch) |
 | Feed löschen | ja | ja (`DELETE /feeds/{id}`, braucht Netz) |
 | Kategorien | freier String | = News-Ordner (beide flach, 1:1) |
-| Pro-Feed aktiv/inaktiv | ja | entfällt (E5) |
+| Pro-Feed aktiv/inaktiv | entfällt generell (E5) | entfällt generell (E5) |
 | Gelesen (Scroll-Tracking) | lokal | lokal + Push an den Server |
 | Lesezeichen | lokal | = Stern, bidirektional synchron |
 | Archiv (geöffnete Artikel) | lokal | lokal; Öffnen pusht zusätzlich „gelesen“ (E6) |
@@ -446,10 +452,12 @@ ohne Löschen · Zugriff in der Files-App entziehen.
 
 ## 10. Rollout-Phasen
 
-1. **Phase 1 – MVP:** Gradle/JitPack, Schema v6, Backend-Naht + `LocalRssBackend`
-   (reiner Refactor, Verhalten unverändert), SSO-Anbindung, `NewsApi` + `:core`-Logik,
-   `NextcloudNewsBackend` (Pull-Sync + Gelesen-/Stern-Push), Settings-Sektion,
-   Moduswechsel, origin-Filter in Queries/Widget, Fehlerbehandlung.
+1. **Phase 1 – MVP:** Vorab-Refactor: Pro-Feed-Aktiv-Schalter entfernen (E5; gern
+   als eigener, unabhängiger Mini-PR vor allem anderen), Gradle/JitPack, Schema v6,
+   Backend-Naht + `LocalRssBackend` (reiner Refactor, Verhalten unverändert),
+   SSO-Anbindung, `NewsApi` + `:core`-Logik, `NextcloudNewsBackend` (Pull-Sync +
+   Gelesen-/Stern-Push), Settings-Sektion, Moduswechsel, origin-Filter in
+   Queries/Widget, Fehlerbehandlung.
 2. **Phase 2 – Feed-Verwaltung & Server-Lebenszyklus:** Feed-CRUD über den Server,
    OPML-Import und „Entdecken“ im Nextcloud-Modus, optionaler Migrationsassistent
    („lokale Feeds zum Server exportieren“ per `POST /feeds`; Lesestatus ist nicht
