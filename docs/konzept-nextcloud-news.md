@@ -1,6 +1,8 @@
 # Konzept: Nextcloud News als optionales Backend
 
-Stand: Juli 2026 · Status: **Konzept, nicht implementiert**
+Stand: Juli 2026 · Status: **Phase 1 + 2 implementiert** (inkl.
+Server-Lebenszyklus §4.3; offen: Phase 3 – Offset-Batching, Login Flow v2,
+Migrationsassistent)
 
 ## 1. Ziel und Abgrenzung
 
@@ -251,6 +253,11 @@ gepusht wurde (durch das Pending-Flag zusätzlich abgesichert).
   das löst das Rückstau-Problem global, erfordert aber Admin-Zugriff und kennt keine
   per-Nutzer-Fristen. Die MyFeed-Option ist das client-seitige Pendant mit den
   vertrauten MyFeed-Aufbewahrungsregeln; beide vertragen sich problemlos.
+- **Ohne die Entstern-Unteroption** gilt für Lesezeichen: Läuft ein Lesezeichen
+  lokal ab, wird nur die lokale Kopie entfernt – der Stern am Server bleibt.
+  Ändert sich der Artikel später serverseitig, kommt er über den Sync als
+  Lesezeichen zurück (kein Datenverlust, aber ein mögliches „Wiederauftauchen“).
+  Mit der Unteroption ist das konsistent gelöst: erst entsternen, dann aufräumen.
 
 ## 5. Architektur
 
