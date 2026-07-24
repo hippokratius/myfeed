@@ -14,6 +14,11 @@ Die **Anmeldung läuft über die Nextcloud-Files-App** (Single Sign-On), wie man
 Nextcloud Talk, Notes oder Deck kennt: MyFeed fragt die installierte Files-App nach
 einem Konto, der Nutzer bestätigt dort den Zugriff – Zugangsdaten berühren MyFeed nie.
 
+Optional kann MyFeed die News-Instanz zusätzlich **aktiv pflegen**: Eine
+Opt-in-Option wendet die in MyFeed eingestellten Aufbewahrungsregeln auch auf den
+Server-Bestand an, damit ungelesene bzw. gesternte Altartikel die News-Datenbank
+nicht unbegrenzt anwachsen lassen (§4.3).
+
 Nicht Teil dieses Konzepts:
 
 - **Kein Parallelbetrieb** beider Quellen im selben Reader (siehe E1).
@@ -33,6 +38,7 @@ Nicht Teil dieses Konzepts:
 | E5 | **Pro-Feed-Aktiv-Schalter im Nextcloud-Modus ausblenden.** | Der Schalter steuert heute nur das Abrufen (`FeedDao.getEnabled()`); der Reader filtert nicht danach. Im Nextcloud-Modus liefert ein einziger API-Aufruf die Items aller Feeds – der Schalter wäre wirkungslos. Feeds stummschalten heißt dort: am Server löschen oder per Wortfilter arbeiten. |
 | E6 | **Artikel öffnen setzt im Nextcloud-Modus zusätzlich „gelesen“** (Push an den Server); das Archiv selbst bleibt ein rein lokales Konzept. | Geöffnete Artikel sollen in der Nextcloud-Weboberfläche als gelesen erscheinen. Nextcloud News kennt kein „Archiv“ – `archivedAt` wird nie synchronisiert. |
 | E7 | **Feed-Discovery bleibt clientseitig**: Die bestehende Auflösung (`FeedSyncer.resolveFeedInput()`) läuft vor dem `POST /feeds`. | Identische UX in beiden Modi (Website-URL eingeben → Vorschläge); der Server erhält immer eine konkrete Feed-URL, weniger Fehlversuche. |
+| E8 | **Server-Lebenszyklus-Management als Opt-in** (§4.3): Auf Wunsch wendet MyFeed seine Aufbewahrungsregeln auch auf den Server-Bestand an – durch **Gelesen-Markieren** abgelaufener ungelesener Artikel und optional **Entsternen** abgelaufener Lesezeichen. | Die News-API kann Artikel nicht löschen; gelöscht wird nur durch den server-seitigen Auto-Purge, und der entfernt ausschließlich *gelesene, nicht gesternte* Artikel. Ungelesene/gesternte Altartikel sammeln sich sonst unbegrenzt an und können die News-Datenbank auffressen. Default: aus, weil die Aktion für alle Clients des Kontos sichtbar ist. |
 
 ## 3. Authentifizierung über die Nextcloud-Files-App (SSO)
 
@@ -129,11 +135,20 @@ Pfade, da die SSO-Bibliothek die Server-Basis beisteuert). Benötigte Endpunkte:
 syncMutex.withLock:
   api = ssoSessionManager.requireApi()          # wirft NotConnected / AuthLost
 
+  # 0. Server-Lebenszyklus anwenden (nur wenn Option aktiv, §4.3)
+  if settings.ncManageLifecycle:
+    # abgelaufene ungelesene Artikel: lokal als gelesen markieren + Pending-Flag
+    articleDao.expireUnread(origin=NC, minPublishedAt=feedCutoff, readAt=now)
+    if settings.ncManageStars:
+      # abgelaufene Lesezeichen: lokal entsternen + Pending-Flag
+      articleDao.expireBookmarks(origin=NC, minBookmarkedAt=bookmarkCutoff)
+    # der Push in Schritt 1 nimmt beides im selben Lauf mit
+
   # 1. Lokale Deltas ZUERST pushen (verhindert, dass der Pull sie zurückdreht)
   readIds   = articleDao.pendingReadRemoteIds()
   starIds   = articleDao.pendingStarRemoteIds()     # Flag + bookmarkedAt != null
   unstarIds = articleDao.pendingUnstarRemoteIds()   # Flag + bookmarkedAt == null
-  api.markItemsRead(readIds);  clearPendingRead(readIds)
+  api.markItemsRead(readIds);  clearPendingRead(readIds)     # in Blöcken (z. B. 500 IDs)
   api.starItems(starIds);      api.unstarItems(unstarIds);  clearPendingStar(...)
   # Fehler ⇒ Exception ⇒ WorkManager-Retry; Flags bleiben stehen, Push ist idempotent
 
@@ -175,6 +190,67 @@ Eigenschaften:
   ältere gelesene Artikel fehlen anfangs, was die Aufbewahrungsdauer ohnehin kappen
   würde. Für sehr große Konten ist `offset`-Batching als Absicherung vorgesehen
   (Phase 3).
+
+### 4.3 Server-Lebenszyklus-Management (Opt-in, E8)
+
+**Motivation.** Nextcloud News löscht Artikel ausschließlich über seinen
+server-seitigen Auto-Purge: Nach jedem Feed-Update werden pro Feed die *gelesenen,
+nicht gesternten* Artikel über dem konfigurierten Limit entfernt (Admin-Einstellung
+„Maximum read count per feed“, Default 200; `-1` deaktiviert das Aufräumen komplett).
+**Ungelesene und gesternte Artikel werden nie gelöscht.** Wer Feeds abonniert, aber
+nicht alles liest, sammelt damit unbegrenzt ungelesene Altartikel an – bis die
+News-Datenbank kippt (genau dieses Szenario ist der Anlass für dieses Feature).
+Die News-API bietet Clients **keinen Lösch-Endpunkt für Artikel**; der einzige Hebel,
+den ein Client hat, ist der Artikel-*Status*: gelesen/ungelesen und Stern.
+
+**Mechanik.** Ist die Option aktiv, wendet MyFeed seine in den Einstellungen
+gewählten Aufbewahrungsregeln auch auf den Server-Bestand an – nicht durch Löschen
+(unmöglich), sondern indem es Artikel **purge-fähig macht**:
+
+| MyFeed-Regel | Server-Aktion bei Ablauf |
+|---|---|
+| Aufbewahrungsdauer Feed (`maxAgeDays`) | Ungelesene Artikel, deren `publishedAt` älter ist, werden als **gelesen** markiert (`items/read/multiple`). |
+| Aufbewahrung Lesezeichen (`bookmarkMaxAgeDays`) | *Nur mit zusätzlicher Unteroption:* abgelaufene Lesezeichen werden **entsternt** (`items/unstar/multiple`). |
+| Aufbewahrung Archiv | Keine Server-Aktion nötig – geöffnete Artikel sind bereits als gelesen gepusht (E6), das Archiv selbst ist lokal. |
+
+Der Schritt läuft zu **Beginn** jedes Syncs (Schritt 0 in §4.2) rein lokal über die
+bestehende Pending-Mechanik (E2): abgelaufene Zeilen erhalten `readAt` bzw. verlieren
+`bookmarkedAt` und bekommen das Pending-Flag; der unmittelbar folgende Push-Schritt
+überträgt die Änderung in ID-Blöcken (z. B. 500 pro Request). Scheitert der Push,
+bleiben die Flags stehen – die Aufräum-Queries verschonen Pending-Zeilen, es geht
+nichts verloren.
+
+**Warum die lokale Spiegel-DB als Kandidatenquelle reicht:** Der Sync hält per
+Definition *alle* ungelesenen und *alle* gesternten Artikel des Kontos lokal vor
+(Initial-Sync §4.2). Genau diese beiden Zustände sind es, die den Server-Purge
+blockieren – die Kandidatensuche ist also eine reine lokale Query, kein zusätzlicher
+API-Scan. Auch ein jahrealter Rückstau ungelesener Artikel wird beim Aktivieren der
+Option erfasst, weil er durch den Initial-Sync im Spiegel liegt. Wichtig ist nur die
+Reihenfolge: Der Lebenszyklus-Schritt läuft **vor** dem lokalen Aufräumen, damit
+abgelaufene ungelesene Artikel nicht aus dem Spiegel fallen, bevor ihre remoteId
+gepusht wurde (durch das Pending-Flag zusätzlich abgesichert).
+
+**Grenzen (im Dokument und in der UI ehrlich benennen):**
+
+- Das eigentliche **Löschen** erledigt weiterhin der Server-Purge. Hat der Admin
+  „Maximum read count per feed“ auf `-1` gestellt, wächst die Datenbank trotz
+  MyFeed weiter – die Einstellungs-UI verlinkt deshalb einen kurzen Hinweistext
+  („MyFeed markiert abgelaufene Artikel als gelesen; entfernt werden sie durch das
+  automatische Aufräumen von Nextcloud News – Limit in dessen Admin-Einstellungen
+  prüfen“).
+- Bereits *gelesene* Altartikel über dem Purge-Limit kann kein Client entfernen;
+  das regelt der Server allein.
+- Die Aktionen sind **kontoweit sichtbar**: Als-gelesen-Markierungen und entfernte
+  Sterne gelten auch in der Weboberfläche und in allen anderen Clients. Deshalb
+  Opt-in mit Bestätigungsdialog, und das Entsternen als separate, noch einmal
+  bewusster zu aktivierende Unteroption (Sterne können von anderen Clients aktiv
+  genutzt werden). Ein auf einem anderen Gerät frisch erneuerter Stern ist sicher:
+  Der Pull aktualisiert `bookmarkedAt` auf den neuen `lastModified`-Zeitstempel,
+  damit beginnt die Lesezeichen-Frist neu.
+- Neuere News-Versionen bieten server-seitig „Purge unread items“ als Admin-Option –
+  das löst das Rückstau-Problem global, erfordert aber Admin-Zugriff und kennt keine
+  per-Nutzer-Fristen. Die MyFeed-Option ist das client-seitige Pendant mit den
+  vertrauten MyFeed-Aufbewahrungsregeln; beide vertragen sich problemlos.
 
 ## 5. Architektur
 
@@ -283,12 +359,17 @@ Queries (`observeAllNewest`, `observeArchived/Bookmarked`, `deleteOlderThan`,
 `setBookmarkedPending(id, ts)`, `pendingRead/Star/UnstarRemoteIds()`,
 `clearPendingRead/Star(remoteIds)` sowie ein Merge-Update, das `readAt`/`bookmarkedAt`
 nur bei nicht gesetztem Pending-Flag überschreibt. Aufräum-Queries erhalten zusätzlich
-`AND pendingReadSync = 0 AND pendingStarSync = 0` (E2-Schutz).
+`AND pendingReadSync = 0 AND pendingStarSync = 0` (E2-Schutz). Für das
+Lebenszyklus-Management (§4.3): `expireUnread(origin, minPublishedAt, readAt)`
+(setzt `readAt` + `pendingReadSync` für ungelesene Artikel unterhalb des Cutoffs)
+und `expireBookmarks(origin, minBookmarkedAt)` (löscht `bookmarkedAt`, setzt
+`pendingStarSync`), jeweils nur für Zeilen mit `remoteId`.
 
 **Neue DataStore-Keys** (`SettingsRepository`): `backend_mode` (Default `"local"`),
 `nc_last_modified` (Sekunden-Cursor, 0 = Initial-Sync ausstehend), `nc_account_name`
 (nur Anzeige – die Wahrheit liegt bei `SingleAccountHelper`), optional
-`nc_last_sync_error`.
+`nc_last_sync_error`; für §4.3 `nc_manage_lifecycle` (Bool, Default aus) und
+`nc_manage_stars` (Bool, Default aus, nur wirksam mit `nc_manage_lifecycle`).
 
 ## 7. UI-Änderungen und Feature-Matrix
 
@@ -296,7 +377,7 @@ nur bei nicht gesetztem Pending-Flag überschreibt. Aufräum-Queries erhalten zu
 
 | Screen | Änderung |
 |---|---|
-| `SettingsScreen` | Neue Sektion „Nextcloud“: nicht verbunden → Button „Mit Nextcloud verbinden“ + Hinweis auf die Files-App; verbunden → Kontoname/Server, Modus-Auswahl *Lokale Feeds* / *Nextcloud News* (Nextcloud nur mit Konto wählbar, Wechsel mit Bestätigungsdialog), „Konto trennen“, Fehlerzeile bei `AuthLost`/`NewsAppMissing`. |
+| `SettingsScreen` | Neue Sektion „Nextcloud“: nicht verbunden → Button „Mit Nextcloud verbinden“ + Hinweis auf die Files-App; verbunden → Kontoname/Server, Modus-Auswahl *Lokale Feeds* / *Nextcloud News* (Nextcloud nur mit Konto wählbar, Wechsel mit Bestätigungsdialog), „Konto trennen“, Fehlerzeile bei `AuthLost`/`NewsAppMissing`. Dazu Schalter **„Aufbewahrung auch auf dem Server anwenden“** (§4.3, mit Bestätigungsdialog: erklärt Gelesen-Markierung, kontoweite Sichtbarkeit und dass das Löschen der Server-Purge übernimmt) und – nur wenn dieser aktiv ist – Unter-Schalter **„Abgelaufene Lesezeichen auch entsternen“**; beide nur im Nextcloud-Modus sichtbar. |
 | `MainActivity` | `onActivityResult` an `AccountImporter.onActivityResult` weiterleiten. |
 | `ReaderScreen` | Queries mit `origin = aktives Origin`; Scroll-Tracking ruft `backend.markRead`, Öffnen `backend.markOpened`, Lesezeichen `backend.setBookmarked`. Sonst unverändert. |
 | `SavedScreen` / `GroupScreen` | Nur origin-bezogene Queries. |
@@ -307,7 +388,9 @@ nur bei nicht gesetztem Pending-Flag überschreibt. Aufräum-Queries erhalten zu
 
 Neue Strings (Deutsch als Default in `values/`, Übersetzung in `values-en/`):
 Verbinden/Trennen, Kontoanzeige, Modus-Labels, Bestätigungs- und Fehlertexte
-(Files-App fehlt, News-App fehlt, Anmeldung erforderlich, Feed abgelehnt, offline).
+(Files-App fehlt, News-App fehlt, Anmeldung erforderlich, Feed abgelehnt, offline)
+sowie Label, Erklärungs- und Bestätigungstexte der Lebenszyklus-Option (§4.3)
+inkl. Hinweis auf den Server-Purge.
 
 ### 7.2 Feature-Matrix
 
@@ -322,7 +405,7 @@ Verbinden/Trennen, Kontoanzeige, Modus-Labels, Bestätigungs- und Fehlertexte
 | Lesezeichen | lokal | = Stern, bidirektional synchron |
 | Archiv (geöffnete Artikel) | lokal | lokal; Öffnen pusht zusätzlich „gelesen“ (E6) |
 | Themen-Gruppierung, Wortfilter, Widget, Bilder | ja | identisch (gemeinsame Nachverarbeitung) |
-| Aufbewahrung/Aufräumen | ja | identisch, origin-bezogen; Server-Bestand bleibt unberührt |
+| Aufbewahrung/Aufräumen | ja | identisch, origin-bezogen; Server-Bestand bleibt unberührt – **außer** die Opt-in-Option §4.3 ist aktiv: dann werden abgelaufene Artikel am Server als gelesen markiert (optional entsternt) und damit für den Server-Purge freigegeben |
 | Lesestatus anderer Geräte/Clients | – | ja (über `/items/updated`) |
 | Offline lesen | ja | ja (lokaler Spiegel) |
 
@@ -346,6 +429,10 @@ Verbinden/Trennen, Kontoanzeige, Modus-Labels, Bestätigungs- und Fehlertexte
 - `NewsRoutesTest`: Pfade/Query-Parameter inkl. `batchSize=-1`.
 - `NewsSyncLogicTest`: Cursor (max-`lastModified`, leere Antwort ⇒ unverändert,
   Überlappungs-Idempotenz); Merge (Pending-Flag gewinnt, `archivedAt` unangetastet).
+- Lebenszyklus (§4.3): Cutoff-Auswahl der Kandidaten (nur ungelesen bzw. nur
+  abgelaufene Sterne, nur mit `remoteId`), ID-Blockbildung für den Push,
+  Frist-Neustart nach Re-Star durch anderen Client (Pull aktualisiert
+  `bookmarkedAt`), Reihenfolge „Lebenszyklus vor lokalem Aufräumen“.
 - `FeedReconcilerTest`: neu/gelöscht/umbenannt/Ordner-Wechsel/Favicon-Änderung.
 - `NewsItemMapperTest`: Bild-Priorität (inkl. Tracker-Pixel-Skip über `HtmlText`),
   Sekunden→Millis, GUID-Fallbacks.
@@ -363,10 +450,11 @@ ohne Löschen · Zugriff in der Files-App entziehen.
    (reiner Refactor, Verhalten unverändert), SSO-Anbindung, `NewsApi` + `:core`-Logik,
    `NextcloudNewsBackend` (Pull-Sync + Gelesen-/Stern-Push), Settings-Sektion,
    Moduswechsel, origin-Filter in Queries/Widget, Fehlerbehandlung.
-2. **Phase 2 – Feed-Verwaltung:** Feed-CRUD über den Server, OPML-Import und
-   „Entdecken“ im Nextcloud-Modus, optionaler Migrationsassistent („lokale Feeds zum
-   Server exportieren“ per `POST /feeds`; Lesestatus ist nicht übertragbar –
-   API-Grenze).
+2. **Phase 2 – Feed-Verwaltung & Server-Lebenszyklus:** Feed-CRUD über den Server,
+   OPML-Import und „Entdecken“ im Nextcloud-Modus, optionaler Migrationsassistent
+   („lokale Feeds zum Server exportieren“ per `POST /feeds`; Lesestatus ist nicht
+   übertragbar – API-Grenze), **Server-Lebenszyklus-Management (§4.3)** – baut nur
+   auf der Pending-Mechanik aus Phase 1 auf und ist bewusst klein gehalten.
 3. **Phase 3 – Ausbau:** Offset-Batching für sehr große Konten, Sync-Fehleranzeige im
    Reader, ggf. **Login Flow v2** als Fallback für Geräte ohne Files-App (erfordert
    eigene Credential-Haltung + zweiten HTTP-Pfad – bewusst nicht Teil dieses
@@ -378,3 +466,8 @@ ohne Löschen · Zugriff in der Files-App entziehen.
 2. Bestätigung von E6 (Öffnen = am Server „gelesen“; Vorschlag: ja).
 3. Ob der Migrationsassistent (Phase 2) den lokalen Bestand nach dem Export
    deaktivieren oder unverändert lassen soll.
+4. Server-Lebenszyklus (§4.3): Soll das Gelesen-Markieren wirklich an
+   `maxAgeDays` (Feed-Aufbewahrung, Default 7 Tage) hängen oder an einer eigenen,
+   großzügigeren Frist (z. B. Default 30 Tage)? Vorschlag: eigene Frist mit
+   eigenem Default, da „aus meinem Reader gefallen“ und „kontoweit als gelesen
+   markiert“ unterschiedlich schwer wiegen.
