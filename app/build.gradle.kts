@@ -52,6 +52,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Von der Nextcloud-SSO-Bibliothek verlangt (java.time & Co. auf minSdk 26).
+        isCoreLibraryDesugaringEnabled = true
     }
 
     buildFeatures {
@@ -103,4 +105,5 @@ dependencies {
     // Nextcloud-Backend: Konto + Netzwerk über die Files-App (SSO), JSON in :core.
     implementation(libs.nextcloud.sso)
     implementation(libs.kotlinx.serialization.json)
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
 }
