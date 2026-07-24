@@ -110,3 +110,10 @@ app/   Android-App:
        └── ui/        Compose: Vollbild-Reader, Feed-Verwaltung, OPML,
                       Einstellungen, Gruppen-Ansicht
 ```
+
+## Konzepte (geplant)
+
+- [Nextcloud News als optionales Backend](docs/konzept-nextcloud-news.md) –
+  Feeds und Gelesen-/Stern-Status vom eigenen Nextcloud-Server,
+  Anmeldung per Single Sign-On über die Nextcloud-Files-App
+  (noch nicht implementiert)
