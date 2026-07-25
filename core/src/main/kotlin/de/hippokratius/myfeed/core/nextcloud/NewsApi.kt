@@ -1,9 +1,14 @@
 package de.hippokratius.myfeed.core.nextcloud
 
+import de.hippokratius.myfeed.core.Beta
+
 /**
  * Aufruf-Oberfläche der News-API. Die Android-Implementierung führt die Routen
  * über die Nextcloud-Files-App aus (SSO); Tests verwenden einen Fake.
+ *
+ * Beta: Teil der Nextcloud-News-Anbindung – kann sich noch ändern.
  */
+@Beta
 interface NewsApi {
     suspend fun version(): NewsVersion
     suspend fun folders(): List<NewsFolder>

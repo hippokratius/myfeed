@@ -1,8 +1,14 @@
 package de.hippokratius.myfeed.core.nextcloud
 
+import de.hippokratius.myfeed.core.Beta
 import de.hippokratius.myfeed.core.rss.HtmlText
 
-/** Mapping-Regeln News-Item → MyFeed-Artikel (reine Funktionen, JVM-testbar). */
+/**
+ * Mapping-Regeln News-Item → MyFeed-Artikel (reine Funktionen, JVM-testbar).
+ *
+ * Beta: Teil der Nextcloud-News-Anbindung – kann sich noch ändern.
+ */
+@Beta
 object NewsItemMapper {
 
     /**

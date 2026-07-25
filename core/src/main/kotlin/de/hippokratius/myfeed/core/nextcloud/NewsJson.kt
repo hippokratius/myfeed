@@ -1,5 +1,6 @@
 package de.hippokratius.myfeed.core.nextcloud
 
+import de.hippokratius.myfeed.core.Beta
 import java.io.InputStream
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
@@ -9,7 +10,10 @@ import kotlinx.serialization.json.decodeFromStream
  * JSON-Konfiguration für die News-API: tolerant gegenüber unbekannten Feldern
  * (API wächst), Zahlen in Anführungszeichen (ältere Server liefern lastModified
  * teils als String) und null für Felder mit Default.
+ *
+ * Beta: Teil der Nextcloud-News-Anbindung – kann sich noch ändern.
  */
+@Beta
 object NewsJson {
 
     val json: Json = Json {

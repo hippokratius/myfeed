@@ -2,6 +2,7 @@ package de.hippokratius.myfeed.nextcloud
 
 import com.nextcloud.android.sso.QueryParam
 import com.nextcloud.android.sso.aidl.NextcloudRequest
+import de.hippokratius.myfeed.core.Beta
 import de.hippokratius.myfeed.core.nextcloud.NewsApi
 import de.hippokratius.myfeed.core.nextcloud.NewsFeedsResponse
 import de.hippokratius.myfeed.core.nextcloud.NewsFolder
@@ -17,7 +18,10 @@ import kotlinx.coroutines.withContext
 /**
  * Führt die in `:core` gebauten [NewsRoute]s über die Files-App aus
  * (SSO-IPC) und parst die Antworten mit den `:core`-Parsern.
+ *
+ * Beta: Teil der Nextcloud-News-Anbindung – kann sich noch ändern.
  */
+@Beta
 class SsoNewsApi(private val sessionManager: SsoSessionManager) : NewsApi {
 
     override suspend fun version(): NewsVersion =
