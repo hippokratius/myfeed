@@ -1,10 +1,17 @@
 package de.hippokratius.myfeed.backend
 
+import de.hippokratius.myfeed.core.Beta
 import de.hippokratius.myfeed.core.model.OpmlFeed
 import de.hippokratius.myfeed.data.FeedEntity
 
 /** Aktives Backend: lokal abonnierte RSS-Feeds oder eine Nextcloud-News-Instanz. */
-enum class BackendMode { LOCAL_RSS, NEXTCLOUD_NEWS }
+enum class BackendMode {
+    LOCAL_RSS,
+
+    /** Beta: Nextcloud-News-Anbindung, siehe docs/konzept-nextcloud-news.md. */
+    @Beta
+    NEXTCLOUD_NEWS,
+}
 
 data class BackendCapabilities(
     /** Feed-Verwaltung (Anlegen/Löschen/Kategorie) braucht eine Server-Verbindung. */

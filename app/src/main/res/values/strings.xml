@@ -98,7 +98,8 @@
     <string name="action_manage_feeds">Feeds verwalten</string>
     <string name="shortcut_feeds_short">Feeds</string>
 
-    <string name="settings_nextcloud">Nextcloud</string>
+    <string name="settings_nextcloud">Nextcloud (Beta)</string>
+    <string name="nextcloud_beta_hint">Die Nextcloud-Anbindung befindet sich in der Beta-Phase – Funktionsumfang und Verhalten können sich noch ändern.</string>
     <string name="nextcloud_connect">Mit Nextcloud verbinden</string>
     <string name="nextcloud_connect_hint">Feeds und Lesestatus von deinem Nextcloud-Server beziehen (News-App). Die Anmeldung läuft über die Nextcloud-App – Zugangsdaten berühren MyFeed nie.</string>
     <string name="nextcloud_connect_checking">Verbinde …</string>
@@ -109,7 +110,7 @@
     <string name="nextcloud_disconnect_delete_data">Nextcloud-Daten vom Gerät löschen</string>
     <string name="nextcloud_mode_title">Quelle der Artikel</string>
     <string name="nextcloud_mode_local">Lokale Feeds</string>
-    <string name="nextcloud_mode_nextcloud">Nextcloud News</string>
+    <string name="nextcloud_mode_nextcloud">Nextcloud News (Beta)</string>
     <string name="nextcloud_switch_confirm_title">Quelle wechseln?</string>
     <string name="nextcloud_switch_confirm_message">Reader und Widget zeigen dann nur noch die gewählte Quelle. Beide Datenbestände bleiben erhalten – du kannst jederzeit zurückwechseln.</string>
     <string name="nextcloud_files_app_missing">Die Nextcloud-App ist nicht installiert. Sie wird für die Anmeldung benötigt.</string>

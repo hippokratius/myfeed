@@ -1,6 +1,9 @@
 package de.hippokratius.myfeed.core.nextcloud
 
+import de.hippokratius.myfeed.core.Beta
+
 /** Lokaler Spiegel eines Server-Feeds (Auszug aus der feeds-Tabelle). */
+@Beta
 data class LocalNcFeed(
     val remoteId: Long,
     val url: String,
@@ -10,6 +13,7 @@ data class LocalNcFeed(
 )
 
 /** Ein vom Server neu zu übernehmender Feed. */
+@Beta
 data class NcFeedInsert(
     val remoteId: Long,
     val url: String,
@@ -19,6 +23,7 @@ data class NcFeedInsert(
 )
 
 /** Änderungen an einem bereits gespiegelten Feed. */
+@Beta
 data class NcFeedUpdate(
     val remoteId: Long,
     val title: String,
@@ -26,6 +31,7 @@ data class NcFeedUpdate(
     val iconUrl: String?,
 )
 
+@Beta
 data class NcFeedChangeSet(
     val inserts: List<NcFeedInsert>,
     val updates: List<NcFeedUpdate>,
@@ -36,7 +42,10 @@ data class NcFeedChangeSet(
 /**
  * Diff zwischen Server-Feeds/-Ordnern und dem lokalen Nextcloud-Spiegel.
  * Der Server ist die Quelle der Wahrheit; Ordnernamen werden zu Kategorien.
+ *
+ * Beta: Teil der Nextcloud-News-Anbindung – kann sich noch ändern.
  */
+@Beta
 object FeedReconciler {
 
     fun reconcile(

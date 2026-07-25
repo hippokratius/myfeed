@@ -1,11 +1,13 @@
 package de.hippokratius.myfeed.core.nextcloud
 
+import de.hippokratius.myfeed.core.Beta
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /** Ein API-Aufruf als reine Daten: Methode, Pfad, Query, optionaler JSON-Body. */
+@Beta
 data class NewsRoute(
     val method: String,
     val path: String,
@@ -17,7 +19,10 @@ data class NewsRoute(
 /**
  * Baut die Routen der News-API v1.3. Reine Funktionen ohne Netz-/Android-Bezug,
  * damit Pfade, Parameter und Bodies JVM-testbar sind.
+ *
+ * Beta: Teil der Nextcloud-News-Anbindung – kann sich noch ändern.
  */
+@Beta
 object NewsRoutes {
 
     const val BASE = "/index.php/apps/news/api/v1-3"

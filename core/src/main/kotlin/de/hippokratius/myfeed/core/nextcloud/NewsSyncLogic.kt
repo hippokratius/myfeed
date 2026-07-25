@@ -1,6 +1,9 @@
 package de.hippokratius.myfeed.core.nextcloud
 
+import de.hippokratius.myfeed.core.Beta
+
 /** Lokaler Lese-/Stern-Zustand eines gespiegelten Artikels (Auszug aus der DB-Zeile). */
+@Beta
 data class LocalStatus(
     val readAt: Long?,
     val bookmarkedAt: Long?,
@@ -8,7 +11,12 @@ data class LocalStatus(
     val pendingStarSync: Boolean,
 )
 
-/** Reine Sync-Regeln: Cursor-Fortschreibung und Status-Merge beim Pull. */
+/**
+ * Reine Sync-Regeln: Cursor-Fortschreibung und Status-Merge beim Pull.
+ *
+ * Beta: Teil der Nextcloud-News-Anbindung – kann sich noch ändern.
+ */
+@Beta
 object NewsSyncLogic {
 
     /**

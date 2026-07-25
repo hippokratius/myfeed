@@ -98,7 +98,8 @@
     <string name="action_manage_feeds">Manage feeds</string>
     <string name="shortcut_feeds_short">Feeds</string>
 
-    <string name="settings_nextcloud">Nextcloud</string>
+    <string name="settings_nextcloud">Nextcloud (Beta)</string>
+    <string name="nextcloud_beta_hint">The Nextcloud integration is in beta – features and behavior may still change.</string>
     <string name="nextcloud_connect">Connect to Nextcloud</string>
     <string name="nextcloud_connect_hint">Fetch feeds and read status from your Nextcloud server (News app). Sign-in happens through the Nextcloud app – credentials never touch MyFeed.</string>
     <string name="nextcloud_connect_checking">Connecting …</string>
@@ -109,7 +110,7 @@
     <string name="nextcloud_disconnect_delete_data">Delete Nextcloud data from this device</string>
     <string name="nextcloud_mode_title">Article source</string>
     <string name="nextcloud_mode_local">Local feeds</string>
-    <string name="nextcloud_mode_nextcloud">Nextcloud News</string>
+    <string name="nextcloud_mode_nextcloud">Nextcloud News (Beta)</string>
     <string name="nextcloud_switch_confirm_title">Switch source?</string>
     <string name="nextcloud_switch_confirm_message">Reader and widget will only show the selected source. Both data sets are kept – you can switch back anytime.</string>
     <string name="nextcloud_files_app_missing">The Nextcloud app is not installed. It is required for signing in.</string>

@@ -58,6 +58,14 @@ internal fun NextcloudSettingsSection(graph: AppGraph, settings: AppSettings) {
 
     SectionTitle(stringResource(R.string.settings_nextcloud))
 
+    // Beta-Hinweis: in allen SSO-Zuständen sichtbar.
+    Text(
+        text = stringResource(R.string.nextcloud_beta_hint),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = 8.dp),
+    )
+
     when (val state = ssoState) {
         is SsoState.Disconnected, is SsoState.Connecting -> {
             Text(

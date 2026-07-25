@@ -14,6 +14,7 @@ import com.nextcloud.android.sso.exceptions.TokenMismatchException
 import com.nextcloud.android.sso.helper.SingleAccountHelper
 import com.nextcloud.android.sso.model.SingleSignOnAccount
 import de.hippokratius.myfeed.backend.BackendException
+import de.hippokratius.myfeed.core.Beta
 import de.hippokratius.myfeed.core.nextcloud.NewsJson
 import de.hippokratius.myfeed.core.nextcloud.NewsRoutes
 import de.hippokratius.myfeed.settings.SettingsRepository
@@ -26,6 +27,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Verbindungszustand zum Nextcloud-Konto (für die Einstellungs-UI). */
+@Beta
 sealed interface SsoState {
     data object Disconnected : SsoState
     data object Connecting : SsoState
@@ -43,7 +45,10 @@ sealed interface SsoState {
  * [NextcloudAPI]-Instanz (Requests laufen per IPC durch die Files-App –
  * Zugangsdaten berühren MyFeed nie) und das Fehler-Mapping auf
  * [BackendException].
+ *
+ * Beta: Teil der Nextcloud-News-Anbindung – kann sich noch ändern.
  */
+@Beta
 class SsoSessionManager(
     private val context: Context,
     private val settingsRepository: SettingsRepository,

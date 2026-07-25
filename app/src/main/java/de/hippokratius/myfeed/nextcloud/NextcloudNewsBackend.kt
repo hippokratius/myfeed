@@ -6,6 +6,7 @@ import de.hippokratius.myfeed.backend.BackendException
 import de.hippokratius.myfeed.backend.BackendMode
 import de.hippokratius.myfeed.backend.FeedBackend
 import de.hippokratius.myfeed.backend.ImportResult
+import de.hippokratius.myfeed.core.Beta
 import de.hippokratius.myfeed.core.model.OpmlFeed
 import de.hippokratius.myfeed.core.nextcloud.FeedReconciler
 import de.hippokratius.myfeed.core.nextcloud.LocalNcFeed
@@ -32,7 +33,10 @@ import kotlinx.coroutines.withContext
  * Ablauf pro Sync (Konzept §4.2): Lebenszyklus (§4.3, Opt-in) → Pending-Deltas
  * pushen → Feeds/Ordner abgleichen → Items ziehen → mergen → Cursor →
  * gemeinsame Nachverarbeitung.
+ *
+ * Beta: Teil der Nextcloud-News-Anbindung – kann sich noch ändern.
  */
+@Beta
 class NextcloudNewsBackend(
     private val api: NewsApi,
     private val feedDao: FeedDao,

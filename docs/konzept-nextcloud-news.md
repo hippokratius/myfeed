@@ -1,8 +1,9 @@
 # Konzept: Nextcloud News als optionales Backend
 
-Stand: Juli 2026 · Status: **Phase 1 + 2 implementiert** (inkl.
+Stand: Juli 2026 · Status: **Beta** – Phase 1 + 2 implementiert (inkl.
 Server-Lebenszyklus §4.3; offen: Phase 3 – Offset-Batching, Login Flow v2,
-Migrationsassistent)
+Migrationsassistent). In App und Quellcode entsprechend als Beta
+gekennzeichnet (`@Beta`-Annotation, „(Beta)"-Label in den Einstellungen).
 
 ## 1. Ziel und Abgrenzung
 

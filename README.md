@@ -111,10 +111,12 @@ app/   Android-App:
                       Einstellungen, Gruppen-Ansicht
 ```
 
-## Nextcloud News (optional)
+## Nextcloud News (optional, Beta)
 
 MyFeed kann statt lokaler RSS-Feeds eine **Nextcloud-News-Instanz** als
-Backend nutzen ([Konzept](docs/konzept-nextcloud-news.md)):
+Backend nutzen ([Konzept](docs/konzept-nextcloud-news.md)). Die Anbindung
+befindet sich in der **Beta-Phase** – Funktionsumfang und Verhalten können
+sich noch ändern:
 
 - Anmeldung per Single Sign-On über die **Nextcloud-App** (wie bei Nextcloud
   Talk) – Zugangsdaten berühren MyFeed nie
