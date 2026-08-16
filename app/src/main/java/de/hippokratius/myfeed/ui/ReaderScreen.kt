@@ -89,6 +89,14 @@ private const val READER_MAX_RELATED = 10
 private const val READ_ALPHA = 0.45f
 
 /**
+ * Fenstergröße um die sichtbare Region: Gelesene Artikel innerhalb dieses
+ * Bereichs bleiben trotz "Gelesene ausblenden" sichtbar (kein Springen beim
+ * Scrollen), außerhalb liegende werden ausgeblendet – so verschwinden alte
+ * gelesene Artikel, wenn ein Sync neue Artikel oben einfügt.
+ */
+private const val SESSION_READ_WINDOW = 20
+
+/**
  * Fullscreen-Ansicht des Feeds: dieselben Inhalte wie das Widget (Einzelartikel
  * und Themen-Gruppen), aber als vollwertiger Reader in der App. Startbildschirm –
  * die App öffnet direkt im Vollbild-Feed.
@@ -137,6 +145,14 @@ fun ReaderScreen(
             filterWords = settings.filterWords,
             maxEntries = Int.MAX_VALUE,
         )
+    }
+
+    // stableId → Position in entries; für die Fenster-Berechnung beim
+    // Bereinigen von sessionReadIds. Basiert auf entries, nicht auf
+    // visibleEntries, damit das Fenster stabil bleibt und nicht durch
+    // das Bereinigen selbst verschoben wird.
+    val entryIndexById = remember(entries) {
+        entries.mapIndexed { i, e -> e.stableId to i }.toMap()
     }
 
     // In dieser Sitzung gelesene Artikel bleiben trotz "Gelesene ausblenden"
@@ -217,6 +233,37 @@ fun ReaderScreen(
                     graph.backendRegistry.current().markRead(ids, System.currentTimeMillis())
                 }
                 seenStableIds += visibleKeys.filterIsInstance<Long>()
+
+                // sessionReadIds auf ein Fenster um die aktuelle Scroll-
+                // Position begrenzen. So werden beim Nachladen (Sync fügt
+                // neue Artikel oben ein) zuvor gelesene Artikel außerhalb
+                // des Fensters ausgeblendet, während die Liste beim
+                // Scrollen nicht springt. Das Fenster basiert auf entries-
+                // Indizes, nicht auf visibleEntries-Indizes, damit es
+                // durch das Bereinigen selbst nicht verschoben wird und
+                // in einem Schritt konvergiert.
+                if (sessionReadIds.isNotEmpty() && entries.isNotEmpty()) {
+                    val visibleEntryIndices = visibleKeys
+                        .filterIsInstance<Long>()
+                        .mapNotNull { key -> entryIndexById[key] }
+                    if (visibleEntryIndices.isNotEmpty()) {
+                        val minIdx = visibleEntryIndices.min()
+                        val maxIdx = visibleEntryIndices.max()
+                        val windowStart = (minIdx - SESSION_READ_WINDOW)
+                            .coerceAtLeast(0)
+                        val windowEnd = (maxIdx + SESSION_READ_WINDOW)
+                            .coerceAtMost(entries.lastIndex)
+                        val nearbyArticleIds = entries
+                            .subList(windowStart, windowEnd + 1)
+                            .flatMap { it.articles() }
+                            .map { it.id }
+                            .toSet()
+                        val pruned = sessionReadIds.filter { it in nearbyArticleIds }
+                        if (pruned.size < sessionReadIds.size) {
+                            sessionReadIds = pruned.toSet()
+                        }
+                    }
+                }
             }
     }
 
