@@ -5,6 +5,7 @@ import android.net.Uri
 import android.text.format.DateFormat
 import android.text.format.DateUtils
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -45,10 +46,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -67,6 +70,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import de.hippokratius.myfeed.AppGraph
@@ -79,11 +85,20 @@ import de.hippokratius.myfeed.widget.WidgetEntry
 import de.hippokratius.myfeed.widget.articles
 import java.io.File
 import java.util.Date
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 
 /** Im Reader dürfen mehr verwandte Artikel gezeigt werden – die Reihe scrollt horizontal. */
 private const val READER_MAX_RELATED = 10
+
+/**
+ * Wie lange nach einer Aktualisierung noch nach oben nachgezogen wird. Room
+ * liefert die neuen Artikel teils erst nach dem Ende des Sync-Workers nach; der
+ * Timer startet bei jeder Listenänderung neu.
+ */
+private const val SCROLL_TO_TOP_SETTLE_MS = 1_500L
 
 /** Deckkraft, mit der gelesene Artikel ausgegraut dargestellt werden. */
 private const val READ_ALPHA = 0.45f
@@ -178,14 +193,6 @@ fun ReaderScreen(
         toggleBookmark(graph, article)
     }
 
-    // Beim Öffnen aktualisieren, wenn der letzte Sync älter als das Intervall ist.
-    LaunchedEffect(Unit) {
-        val current = graph.settingsRepository.current()
-        val stale = System.currentTimeMillis() - current.lastSyncMillis >
-            current.refreshIntervalMinutes * 60_000L
-        if (stale) FeedFetchWorker.syncNow(context)
-    }
-
     // Scroll-Zustand der Artikelliste; sichtbar gemacht für den "Zum Anfang"-FAB.
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -197,6 +204,71 @@ fun ReaderScreen(
     // alte Scroll-Position nicht auf die neue Liste anwendet.
     LaunchedEffect(effectiveCategory) {
         listState.scrollToItem(0)
+    }
+
+    // Nach einer vom Nutzer ausgelösten Aktualisierung soll der Feed wieder ganz
+    // oben stehen: Neue Artikel werden oben eingefügt, die LazyColumn verankert
+    // sich aber am sichtbaren Eintrag – man bliebe sonst mitten im Feed stehen
+    // und bekäme die neuen Nachrichten gar nicht zu sehen.
+    var scrollToTopPending by remember { mutableStateOf(false) }
+    val refreshNow: () -> Unit = {
+        scrollToTopPending = true
+        FeedFetchWorker.syncNow(context)
+    }
+
+    // Der Sync schreibt Artikel, Gruppierung und Zeitstempel nacheinander; die
+    // neuen Einträge können also erst nach dem Worker-Ende aus Room nachlaufen.
+    // Deshalb wird im Nachlauf-Fenster bei jeder Listenänderung erneut nach oben
+    // gezogen, bis nach dem Sync eine Weile Ruhe herrscht.
+    LaunchedEffect(scrollToTopPending, visibleEntries, syncRunning) {
+        if (!scrollToTopPending) return@LaunchedEffect
+        listState.scrollToItem(0)
+        if (!syncRunning) {
+            delay(SCROLL_TO_TOP_SETTLE_MS)
+            scrollToTopPending = false
+        }
+    }
+
+    // Scrollt der Nutzer im Nachlauf-Fenster selbst, gewinnt er: Sonst risse die
+    // nächste Listenänderung die Liste unter dem Finger wieder nach oben.
+    LaunchedEffect(scrollToTopPending) {
+        if (!scrollToTopPending) return@LaunchedEffect
+        listState.interactionSource.interactions
+            .filterIsInstance<DragInteraction.Start>()
+            .collect { scrollToTopPending = false }
+    }
+
+    // Beim Öffnen aktualisieren, wenn der letzte Sync älter als das Intervall
+    // ist. Über den Lifecycle statt einmalig pro Composition, denn die Activity
+    // ist "singleTop": Aus dem Hintergrund zurückzukehren baut den Reader nicht
+    // neu auf, die Prüfung liefe sonst nie wieder.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    // Nur im Speicher – nach Prozess-Tod startet die Liste ohnehin oben.
+    var awaySinceMillis by remember { mutableLongStateOf(0L) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> awaySinceMillis = System.currentTimeMillis()
+                Lifecycle.Event.ON_START -> scope.launch {
+                    val current = graph.settingsRepository.current()
+                    val now = System.currentTimeMillis()
+                    val intervalMillis = current.refreshIntervalMinutes * 60_000L
+                    // War die App länger als ein Aktualisierungs-Intervall weg,
+                    // ist die Scroll-Position veraltet. Bewusst unabhängig vom
+                    // Sync: Hat der Hintergrund-Sync inzwischen schon geladen,
+                    // liegen oben trotzdem ungesehene Artikel.
+                    if (awaySinceMillis > 0 && now - awaySinceMillis > intervalMillis) {
+                        scrollToTopPending = true
+                    }
+                    if (now - current.lastSyncMillis > intervalMillis) {
+                        FeedFetchWorker.syncNow(context)
+                    }
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     // Einträge, die in dieser Sitzung tatsächlich auf dem Bildschirm waren.
@@ -289,7 +361,7 @@ fun ReaderScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { FeedFetchWorker.syncNow(context) }) {
+                    IconButton(onClick = refreshNow) {
                         Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.action_refresh))
                     }
                     IconButton(onClick = { menuExpanded = true }) {
@@ -370,7 +442,7 @@ fun ReaderScreen(
     ) { padding ->
         PullToRefreshBox(
             isRefreshing = syncRunning,
-            onRefresh = { FeedFetchWorker.syncNow(context) },
+            onRefresh = refreshNow,
             modifier = Modifier.fillMaxSize().padding(padding),
         ) {
             when {

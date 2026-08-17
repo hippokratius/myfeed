@@ -28,6 +28,13 @@ vermutlich über dasselbe Thema berichten, werden zu einer Karte gruppiert.
   Artikel, über die von oben nach unten hinweggescrollt wurde, gelten als
   gelesen, werden ausgegraut dargestellt und lassen sich per Augen-Symbol
   in der Titelzeile ausblenden
+- **Immer bei den neuesten Nachrichten**: Nach einer selbst ausgelösten
+  Aktualisierung (Herunterziehen oder Aktualisieren-Symbol) springt der Feed
+  an den Anfang, damit die neu oben eingefügten Artikel auch sichtbar sind.
+  Dasselbe beim Öffnen der App, wenn sie länger als ein
+  Aktualisierungsintervall im Hintergrund war. Scrollt man währenddessen
+  selbst, bleibt die eigene Position erhalten; ein Sync im Hintergrund reißt
+  einen beim Lesen nie aus der Position
 - **Archiv**: Geöffnete (angetippte) Artikel – auch aus dem Widget – werden
   automatisch archiviert und bleiben über die normale Aufbewahrungsdauer
   hinaus in der Archiv-Liste auffindbar
