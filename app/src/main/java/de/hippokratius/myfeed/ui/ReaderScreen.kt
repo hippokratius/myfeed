@@ -134,6 +134,7 @@ fun ReaderScreen(
     val categories by remember(origin) { graph.feedDao.observeCategories(origin) }
         .collectAsState(initial = emptyList())
     val syncRunning by FeedFetchWorker.observeSyncRunning(context).collectAsState(initial = false)
+    val autoSyncRunning by FeedFetchWorker.observeAutoSyncRunning(context).collectAsState(initial = false)
 
     var selectedCategory by rememberSaveable { mutableStateOf<String?>(null) }
     // Erst wirksam, wenn die Kategorie (noch) existiert – so überlebt die
@@ -220,10 +221,11 @@ fun ReaderScreen(
     // neuen Einträge können also erst nach dem Worker-Ende aus Room nachlaufen.
     // Deshalb wird im Nachlauf-Fenster bei jeder Listenänderung erneut nach oben
     // gezogen, bis nach dem Sync eine Weile Ruhe herrscht.
-    LaunchedEffect(scrollToTopPending, visibleEntries, syncRunning) {
+    val anySyncRunning = syncRunning || autoSyncRunning
+    LaunchedEffect(scrollToTopPending, visibleEntries, anySyncRunning) {
         if (!scrollToTopPending) return@LaunchedEffect
         listState.scrollToItem(0)
-        if (!syncRunning) {
+        if (!anySyncRunning) {
             delay(SCROLL_TO_TOP_SETTLE_MS)
             scrollToTopPending = false
         }
@@ -236,6 +238,15 @@ fun ReaderScreen(
         listState.interactionSource.interactions
             .filterIsInstance<DragInteraction.Start>()
             .collect { scrollToTopPending = false }
+    }
+
+    // Auch beim automatischen (periodischen) Nachladen zum Anfang des Feeds
+    // springen – neu geladene Artikel werden oben eingefügt und blieben sonst
+    // unsichtbar, wenn der Nutzer weiter unten im Feed stand.
+    LaunchedEffect(autoSyncRunning) {
+        if (autoSyncRunning) {
+            scrollToTopPending = true
+        }
     }
 
     // Beim Öffnen aktualisieren, wenn der letzte Sync älter als das Intervall

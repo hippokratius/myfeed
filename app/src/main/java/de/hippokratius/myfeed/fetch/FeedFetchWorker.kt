@@ -67,5 +67,11 @@ class FeedFetchWorker(
             WorkManager.getInstance(context)
                 .getWorkInfosForUniqueWorkFlow(ONE_TIME_WORK_NAME)
                 .map { infos -> infos.any { it.state == WorkInfo.State.RUNNING } }
+
+        /** Läuft gerade der automatische (periodische) Hintergrund-Sync? */
+        fun observeAutoSyncRunning(context: Context): Flow<Boolean> =
+            WorkManager.getInstance(context)
+                .getWorkInfosForUniqueWorkFlow(PERIODIC_WORK_NAME)
+                .map { infos -> infos.any { it.state == WorkInfo.State.RUNNING } }
     }
 }
