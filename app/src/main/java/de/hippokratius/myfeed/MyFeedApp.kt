@@ -7,6 +7,7 @@ import coil.ImageLoaderFactory
 import de.hippokratius.myfeed.backend.BackendRegistry
 import de.hippokratius.myfeed.backend.LocalRssBackend
 import de.hippokratius.myfeed.data.AppDatabase
+import de.hippokratius.myfeed.fetch.FaviconResolver
 import de.hippokratius.myfeed.fetch.FeedFetchWorker
 import de.hippokratius.myfeed.fetch.FeedSyncer
 import de.hippokratius.myfeed.fetch.SyncPostProcessor
@@ -39,7 +40,8 @@ class AppGraph(context: Context) {
         .build()
 
     val thumbnailStore = ThumbnailStore(context, httpClient)
-    val feedSyncer = FeedSyncer(feedDao, articleDao, httpClient, thumbnailStore)
+    val faviconResolver = FaviconResolver(httpClient, thumbnailStore)
+    val feedSyncer = FeedSyncer(feedDao, articleDao, httpClient, thumbnailStore, faviconResolver)
     val syncPostProcessor =
         SyncPostProcessor(context, feedDao, articleDao, settingsRepository, thumbnailStore)
 
