@@ -49,6 +49,7 @@ class FeedSyncer(
     private val articleDao: ArticleDao,
     val httpClient: OkHttpClient,
     private val thumbnailStore: ThumbnailStore,
+    private val faviconResolver: FaviconResolver,
 ) {
 
     /** Für die Feed-Suche im Dialog: harte Gesamtdauer pro Request statt Minuten-Timeouts. */
@@ -152,12 +153,15 @@ class FeedSyncer(
         }
         val sourceTitle = feed.title.ifBlank { parsed.title ?: feed.url }
 
-        // Feed-Logo cachen, wenn neu oder geändert.
-        val iconUrl = parsed.iconUrl
-        if (iconUrl != null && (iconUrl != feed.iconUrl || feed.iconPath == null)) {
-            val path = thumbnailStore.downloadIcon(feed.id, iconUrl)
-            if (path != null) {
-                feedDao.updateIcon(feed.id, iconUrl, path)
+        // Feed-Logo aktualisieren: deklariertes Logo, sonst Favicon-Fallback
+        // (Startseite → /manifest.json → /favicon.ico). Neu laden, wenn das Icon
+        // fehlt oder sich die deklarierte Quelle geändert hat.
+        val iconNeedsRefresh =
+            feed.iconPath == null || (parsed.iconUrl != null && parsed.iconUrl != feed.iconUrl)
+        if (iconNeedsRefresh) {
+            val resolved = faviconResolver.resolve(feed.id, feed.url, parsed.iconUrl)
+            if (resolved != null && (resolved.url != feed.iconUrl || feed.iconPath == null)) {
+                feedDao.updateIcon(feed.id, resolved.url, resolved.path)
             }
         }
 
@@ -231,7 +235,7 @@ class FeedSyncer(
         const val USER_AGENT = "MyFeed/1.0 (+https://github.com/hippokratius/kveasitso-rss)"
 
         /** Zweitversuch als Browser, wenn ein Server die eigene Kennung ablehnt. */
-        private const val BROWSER_USER_AGENT =
+        internal const val BROWSER_USER_AGENT =
             "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
         private val BROWSER_UA_RETRY_CODES = setOf(401, 403, 406)
         private const val ACCEPT_FEED =
