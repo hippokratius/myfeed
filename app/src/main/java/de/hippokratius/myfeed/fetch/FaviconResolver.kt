@@ -2,6 +2,7 @@ package de.hippokratius.myfeed.fetch
 
 import de.hippokratius.myfeed.core.discovery.FaviconLinkFinder
 import java.io.InputStream
+import java.nio.charset.Charset
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
